@@ -8,7 +8,7 @@ const { sendFile, deleteMessage, loadMessages } = require('./bot');
 
 const app = express();
 const upload = multer({ dest: 'uploads/' });
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8100;
 
 app.use(session({
   secret: process.env.SESSION_SECRET, // 从 .env 文件加载密钥
