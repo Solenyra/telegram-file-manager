@@ -1,16 +1,13 @@
 require('dotenv').config();
 const express = require('express');
-const session = require('express-session'); // This line is now correct
+const session = require('express-session'); // 已修正
 const multer = require('multer');
 const path = require('path');
 const { sendFile, deleteMessage, loadMessages } = require('./bot');
 
 const app = express();
-// Configure multer to use memory storage for streaming
-const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
-
-const PORT = process.env.PORT || 8100;
+const upload = multer({ dest: 'uploads/' });
+const PORT = 3000;
 
 app.use(session({
   secret: process.env.SESSION_SECRET || 'a_default_secret_for_development',
@@ -31,37 +28,41 @@ app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, 'views/login.html'));
 });
 
+// ==================== 診斷代碼開始 ====================
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
-  if (username === process.env.ADMIN_USER && password === process.env.ADMIN_PASS) {
+
+  // 從 .env 文件讀取正確的用戶名和密碼
+  const correctUser = process.env.ADMIN_USER;
+  const correctPass = process.env.ADMIN_PASS;
+
+  console.log('--- 開始登錄診斷 ---');
+  console.log(`[來自 .env 文件] 正確的用戶名是: "${correctUser}" (類型: ${typeof correctUser})`);
+  console.log(`[來自 .env 文件] 正確的密碼是: "${correctPass}" (類型: ${typeof correctPass})`);
+  console.log('--------------------');
+  console.log(`[來自登錄表單] 您輸入的用戶名是: "${username}" (類型: ${typeof username})`);
+  console.log(`[來自登錄表單] 您輸入的密碼是: "${password}" (類型: ${typeof password})`);
+  console.log('--------------------');
+
+  if (username === correctUser && password === correctPass) {
+    console.log('✅ 驗證成功！正在跳轉...');
     req.session.loggedIn = true;
     res.redirect('/');
   } else {
+    console.log('❌ 驗證失敗！返回 "Invalid credentials"。');
     res.send('Invalid credentials');
   }
+  console.log('--- 結束登錄診斷 ---\n');
 });
+// ==================== 診斷代碼結束 ====================
 
 app.get('/', requireLogin, (req, res) => {
   res.sendFile(path.join(__dirname, 'views/dashboard.html'));
 });
 
-// Handle in-memory file upload
 app.post('/upload', requireLogin, upload.single('file'), async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No file selected' });
-  }
-
-  try {
-    const result = await sendFile(
-      req.file.buffer,
-      req.file.originalname,
-      req.body.caption || ''
-    );
-    res.json(result);
-  } catch (error) {
-    console.error('Upload failed:', error);
-    res.status(500).json({ success: false, message: 'Internal server error' });
-  }
+  const result = await sendFile(req.file.path, req.body.caption || '');
+  res.json(result);
 });
 
 app.get('/files', requireLogin, (req, res) => {
@@ -71,6 +72,8 @@ app.get('/files', requireLogin, (req, res) => {
 app.post('/delete', requireLogin, async (req, res) => {
   const { message_id } = req.body;
   await deleteMessage(message_id);
+  const messages = loadMessages().filter(m => m.message_id !== message_id);
+  require('fs').writeFileSync('data/messages.json', JSON.stringify(messages));
   res.sendStatus(200);
 });
 
