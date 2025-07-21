@@ -18,4 +18,4 @@
 #### 使用 `curl` (推荐):
 
 ```bash
-bash -c "$(curl -fsSL [https://raw.githubusercontent.com/Limkon/telegram-file-manager/master/install.sh](https://raw.githubusercontent.com/Limkon/telegram-file-manager/master/install.sh))"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/Limkon/telegram-file-manager/master/install.sh)"
