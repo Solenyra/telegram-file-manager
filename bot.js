@@ -36,12 +36,11 @@ async function sendFile(fileBuffer, fileName, mimetype, caption = '') {
   formData.append('document', fileBuffer, { filename: fileName });
 
   try {
+    // *** 關鍵修正 ***
+    // 移除了手動設置的 Content-Type，讓 axios 自動從 formData 生成正確的、包含 boundary 的 header。
+    // form-data 庫會自動處理包含非 ASCII 字符的文件名，生成符合 RFC 規範的 header。
     const res = await axios.post(`${TELEGRAM_API}/sendDocument`, formData, {
-      headers: {
-        ...formData.getHeaders(),
-        // 確保 header 編碼正確處理中文
-        'Content-Type': `multipart/form-data; boundary=${formData.getBoundary()}; charset=UTF-8`,
-      },
+      headers: formData.getHeaders(),
     });
 
     if (res.data.ok && res.data.result.document && res.data.result.document.file_id) {
@@ -106,8 +105,6 @@ async function renameFileInDb(messageId, newFileName) {
 async function deleteMessages(messageIds) {
     const results = { success: [], failure: [] };
     const messages = loadMessages();
-    // 先過濾出需要刪除的和需要保留的
-    const messagesToDelete = messages.filter(m => messageIds.includes(m.message_id));
     const remainingMessages = messages.filter(m => !messageIds.includes(m.message_id));
 
     for (const messageId of messageIds) {
@@ -122,10 +119,9 @@ async function deleteMessages(messageIds) {
                 results.failure.push({ id: messageId, reason: res.data.description });
             }
         } catch (error) {
-            // 即使 Telegram 刪除失敗 (例如消息已不存在)，也視為本地需要處理
             const reason = error.response ? error.response.data.description : error.message;
             if (reason.includes("message to delete not found")) {
-                results.success.push(messageId); // 遠端已不存在，也算成功
+                results.success.push(messageId);
             } else {
                 results.failure.push({ id: messageId, reason });
             }
