@@ -7,7 +7,7 @@ const FormData = require('form-data');
 const TELEGRAM_API = `https://api.telegram.org/bot${process.env.BOT_TOKEN}`;
 const DATA_FILE = path.join(__dirname, 'data/messages.json');
 
-// --- 內部函數 ---
+// --- 內部函數 (保持不變) ---
 function loadMessages() {
   try {
     if (fs.existsSync(DATA_FILE)) {
@@ -40,21 +40,30 @@ async function sendFile(fileBuffer, fileName, mimetype, caption = '') {
       headers: formData.getHeaders(),
     });
 
-    if (res.data.ok && res.data.result.document && res.data.result.document.file_id) {
-      const messages = loadMessages();
-      messages.push({
-        fileName,
-        mimetype,
-        message_id: res.data.result.message_id,
-        file_id: res.data.result.document.file_id,
-        date: Date.now(),
-      });
-      saveMessages(messages);
-      return { success: true, data: res.data };
-    } else {
-      console.error('Telegram API 返回的數據格式不正確或操作失敗:', res.data);
-      return { success: false, error: res.data };
+    // *** 關鍵修正：兼容不同的媒體類型 ***
+    if (res.data.ok) {
+        const result = res.data.result;
+        // 嘗試從 document, video, audio, photo 等常見類型中獲取文件信息
+        const fileData = result.document || result.video || result.audio || result.photo;
+
+        if (fileData && fileData.file_id) {
+            const messages = loadMessages();
+            messages.push({
+                fileName,
+                mimetype: fileData.mime_type || mimetype, // 優先使用 Telegram 返回的 mimetype
+                message_id: result.message_id,
+                file_id: fileData.file_id,
+                date: Date.now(),
+            });
+            saveMessages(messages);
+            return { success: true, data: res.data };
+        }
     }
+    
+    // 如果上面的條件都不滿足，則視為失敗
+    console.error('Telegram API 返回的數據格式不正確或操作失敗:', res.data);
+    return { success: false, error: res.data };
+
   } catch (error) {
     const errorData = error.response ? error.response.data : error.message;
     console.error('發送文件到 Telegram 失敗:', errorData);
@@ -62,6 +71,7 @@ async function sendFile(fileBuffer, fileName, mimetype, caption = '') {
   }
 }
 
+// --- 其他函數 (保持不變) ---
 async function getFileLink(file_id) {
   if (!file_id || typeof file_id !== 'string') {
       return null;
