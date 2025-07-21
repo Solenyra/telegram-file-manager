@@ -119,7 +119,7 @@ body {
   box-shadow: 0 0 0 3px var(--primary-color);
 }
 
-/* *** 關鍵修正：隱藏多選框 *** */
+/* 根據您的要求，隱藏多選框，回歸簡潔設計 */
 .checkbox-container {
   display: none;
 }
@@ -179,14 +179,26 @@ body {
   z-index: 1000;
 }
 
+.action-bar.visible {
+  bottom: 20px;
+}
+
+.action-bar #selectAllBtn {
+    background: #495057;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    margin-right: 15px; /* 與計數器分開 */
+    border-radius: 5px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
 .action-bar #selectionCount {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-}
-
-.action-bar.visible {
-  bottom: 20px;
+    flex-grow: 1; /* 佔用多餘空間 */
 }
 
 .action-bar .actions button {
