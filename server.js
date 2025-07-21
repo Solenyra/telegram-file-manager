@@ -1,118 +1,87 @@
-require('dotenv').config();
-const express = require('express');
-const session = require('express-session');
-const multer = require('multer');
-const path = require('path');
-const axios = require('axios'); // 需要 axios 來代理獲取文件內容
-const { sendFile, loadMessages, getFileLink, renameFileInDb, deleteMessages } = require('./bot.js');
+const fileInput = document.getElementById('fileInput');
+const fileListContainer = document.getElementById('file-selection-list');
 
-const app = express();
-const storage = multer.memoryStorage();
-// 增加文件大小限制到 50MB
-const upload = multer({ storage: storage, limits: { fileSize: 500 * 1024 * 1024 } });
-const PORT = process.env.PORT || 8100;
-
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'your-strong-random-secret-here-please-change',
-  resave: false,
-  saveUninitialized: false,
-}));
-
-app.use(express.static('public'));
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
-
-const fixFileNameEncoding = (req, res, next) => {
-    if (req.files) {
-        req.files.forEach(file => {
-            const originalNameBuffer = Buffer.from(file.originalname, 'latin1');
-            file.originalname = originalNameBuffer.toString('utf8');
-        });
+fileInput.addEventListener('change', () => {
+    fileListContainer.innerHTML = '';
+    if (fileInput.files.length > 0) {
+        for (const file of fileInput.files) {
+            const listItem = document.createElement('li');
+            const fileSize = (file.size / 1024 / 1024).toFixed(2);
+            listItem.innerHTML = `<span>${file.name}</span><small>${fileSize} MB</small>`;
+            fileListContainer.appendChild(listItem);
+        }
     }
-    next();
+});
+
+document.getElementById('uploadForm').onsubmit = async function (e) {
+  e.preventDefault();
+  const formData = new FormData();
+  if (fileInput.files.length === 0) {
+    showNotification('請先選擇至少一個文件', 'error');
+    return;
+  }
+  for (let i = 0; i < fileInput.files.length; i++) {
+    formData.append('files', fileInput.files[i]);
+  }
+  const caption = e.target.querySelector('input[type="text"]').value;
+  if (caption) { formData.append('caption', caption); }
+
+  const submitButton = e.target.querySelector('button[type="submit"]');
+  const progressArea = document.getElementById('progressArea');
+  const progressBar = document.getElementById('progressBar');
+
+  submitButton.disabled = true;
+  submitButton.textContent = '上傳中...';
+  progressArea.style.display = 'block';
+  progressBar.style.width = '0%';
+  progressBar.textContent = '0%';
+
+  const config = {
+    onUploadProgress: function(progressEvent) {
+      if (progressEvent.total) {
+        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        progressBar.style.width = percentCompleted + '%';
+        progressBar.textContent = percentCompleted + '%';
+      }
+    }
+  };
+
+  try {
+    const res = await axios.post('/upload', formData, config);
+    if (res.data.success) {
+      // *** 關鍵修正 4：更詳細的錯誤反饋 ***
+      const failedUploads = res.data.results.filter(r => !r.success);
+      if (failedUploads.length > 0) {
+        const firstError = failedUploads[0].error?.description || '未知錯誤';
+        showNotification(`有 ${failedUploads.length} 個文件上傳失敗。錯誤: ${firstError}`, 'error');
+      } else {
+        showNotification('所有文件上傳成功！', 'success');
+      }
+      e.target.reset();
+      fileListContainer.innerHTML = '';
+    } else {
+      showNotification(res.data.message || '上傳請求失敗', 'error');
+    }
+  } catch (error) {
+    const errorMessage = error.response?.data?.message || '網絡或服務器錯誤';
+    showNotification(`上傳失敗: ${errorMessage}`, 'error');
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = '上傳';
+    setTimeout(() => { progressArea.style.display = 'none'; }, 2000);
+  }
 };
 
-function requireLogin(req, res, next) {
-  if (req.session.loggedIn) return next();
-  res.redirect('/login');
-}
-
-// --- 路由 ---
-app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'views/login.html')));
-app.post('/login', (req, res) => {
-  if (req.body.username === process.env.ADMIN_USER && req.body.password === process.env.ADMIN_PASS) {
-    req.session.loggedIn = true;
-    res.redirect('/');
-  } else {
-    res.status(401).send('Invalid credentials');
-  }
-});
-app.get('/', requireLogin, (req, res) => res.sendFile(path.join(__dirname, 'views/manager.html')));
-app.get('/upload-page', requireLogin, (req, res) => res.sendFile(path.join(__dirname, 'views/dashboard.html')));
-
-// --- API 接口 ---
-app.post('/upload', requireLogin, upload.array('files'), fixFileNameEncoding, async (req, res) => {
-    if (!req.files || req.files.length === 0) {
-        return res.status(400).json({ success: false, message: '沒有選擇文件' });
-    }
-    const results = [];
-    for (const file of req.files) {
-        const result = await sendFile(file.buffer, file.originalname, file.mimetype, req.body.caption || '');
-        results.push(result);
-    }
-    res.json({ success: true, results });
-});
-
-app.get('/files', requireLogin, (req, res) => res.json(loadMessages()));
-
-app.get('/file/:message_id', requireLogin, async (req, res) => {
-  const messageId = parseInt(req.params.message_id, 10);
-  const messages = loadMessages();
-  const fileInfo = messages.find(m => m.message_id === messageId);
-  if (fileInfo && fileInfo.file_id) {
-    const link = await getFileLink(fileInfo.file_id);
-    if (link) return res.json({ success: true, url: link });
-  }
-  res.status(404).json({ success: false, message: '無法獲取文件鏈接。' });
-});
-
-// *** 新增：獲取文本文件內容的接口 ***
-app.get('/file/content/:message_id', requireLogin, async (req, res) => {
-    const messageId = parseInt(req.params.message_id, 10);
-    const messages = loadMessages();
-    const fileInfo = messages.find(m => m.message_id === messageId);
-
-    if (fileInfo && fileInfo.file_id) {
-        const link = await getFileLink(fileInfo.file_id);
-        if (link) {
-            try {
-                // 從 Telegram 的臨時鏈接下載文件內容
-                const response = await axios.get(link, { responseType: 'text' });
-                res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-                res.send(response.data);
-            } catch (error) {
-                res.status(500).json({ success: false, message: '無法獲取文件內容。' });
-            }
-        } else {
-            res.status(404).json({ success: false, message: '無法獲取文件鏈接。' });
+function showNotification(message, type = 'info') {
+    const existingNotif = document.querySelector('.notification');
+    if (existingNotif) { existingNotif.remove(); }
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    setTimeout(() => {
+        if (notification.parentElement) {
+          notification.parentElement.removeChild(notification);
         }
-    } else {
-        res.status(404).json({ success: false, message: '文件未找到。' });
-    }
-});
-
-app.post('/rename', requireLogin, async (req, res) => {
-    const { messageId, newFileName } = req.body;
-    if (!messageId || !newFileName) return res.status(400).json({ success: false, message: '缺少必要參數。'});
-    const result = await renameFileInDb(parseInt(messageId, 10), newFileName);
-    res.json(result);
-});
-
-app.post('/delete-multiple', requireLogin, async (req, res) => {
-    const { messageIds } = req.body;
-    if (!messageIds || !Array.isArray(messageIds)) return res.status(400).json({ success: false, message: '無效的 messageIds。' });
-    const result = await deleteMessages(messageIds);
-    res.json(result);
-});
-
-app.listen(PORT, () => console.log(`✅ 服務器運行在 http://localhost:${PORT}`));
+    }, 5000); // 延長錯誤提示時間
+}
