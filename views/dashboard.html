@@ -6,15 +6,24 @@
   <title>文件上傳</title>
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
   <link rel="stylesheet" href="/manager.css"> <style>
+    :root {
+      --primary-color: #007bff;
+      --background-color: #f4f7f6;
+      --card-background: #ffffff;
+      --text-color: #333;
+      --shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
     body {
         display: flex;
         justify-content: center;
         align-items: flex-start;
         min-height: 100vh;
+        background-color: var(--background-color);
     }
     .container {
         width: 100%;
         max-width: 600px;
+        padding-top: 20px;
     }
     .manager-link {
         display: inline-block;
