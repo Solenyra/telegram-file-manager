@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (mimetype.startsWith('video/')) return 'video';
         if (mimetype.startsWith('audio/')) return 'audio';
         if (mimetype.startsWith('application/pdf') || mimetype.startsWith('text/') || mimetype.includes('document')) return 'document';
-        if (mimetype.startsWith('application/zip') || mimetype.startsWith('application/x-rar-compressed')) return 'archive';
+        if (mimetype.startsWith('application/zip') || mimetype.startsWith('application/x-rar-compressed') || mimetype.includes('archive')) return 'archive';
         return 'other';
     };
 
@@ -84,6 +84,15 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await axios.get('/files');
             allFiles = res.data.sort((a, b) => b.date - a.date);
+            // 維持現有的選擇狀態
+            const existingSelected = new Set();
+            allFiles.forEach(file => {
+                if(selectedFiles.has(file.message_id)) {
+                    existingSelected.add(file.message_id);
+                }
+            });
+            selectedFiles = existingSelected;
+            updateActionBar();
             filterAndRender();
         } catch (error) {
             fileGrid.innerHTML = '<p>加載文件失敗，請稍後重試。</p>';
@@ -159,9 +168,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                     const res = await axios.get(`/file/${messageId}`);
                     if (res.data.success) {
-                        // 使用 window.open 在新標籤頁中觸發下載，更可靠
                         window.open(res.data.url, '_blank');
-                        await new Promise(resolve => setTimeout(resolve, 500)); // 間隔
+                        await new Promise(resolve => setTimeout(resolve, 500));
                     }
                 } catch (error) { console.error(`下載文件 ${file.fileName} 失敗`); }
             }
