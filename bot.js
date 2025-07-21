@@ -10,7 +10,7 @@ const DATA_FILE = path.join(__dirname, 'data/messages.json');
 function loadMessages() {
   try {
     if (fs.existsSync(DATA_FILE)) {
-      return JSON.parse(fs.readFileSync(DATA_FILE));
+      return JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
     }
   } catch (e) {
     console.error("讀取 messages.json 失敗:", e);
@@ -26,7 +26,8 @@ function saveMessages(messages) {
   }
 }
 
-async function sendFile(fileBuffer, fileName, caption = '') {
+// 增加了 mimetype 參數
+async function sendFile(fileBuffer, fileName, mimetype, caption = '') {
   const formData = new FormData();
   formData.append('chat_id', process.env.CHANNEL_ID);
   formData.append('caption', caption || fileName);
@@ -41,24 +42,38 @@ async function sendFile(fileBuffer, fileName, caption = '') {
       const messages = loadMessages();
       messages.push({
         fileName,
+        mimetype, // 保存文件的 MIME type
         message_id: res.data.result.message_id,
+        file_id: res.data.result.document.file_id, // 保存 file_id 以便後續獲取文件
         date: Date.now(),
       });
       saveMessages(messages);
       return { success: true, data: res.data };
     } else {
-      // 如果 Telegram 返回 ok: false，也作為一個錯誤來處理
       console.error('Telegram API 返回錯誤:', res.data);
-      // 返回一個包含錯誤信息的對象，而不是拋出異常
       return { success: false, error: res.data };
     }
   } catch (error) {
-    // 捕獲網絡層面的錯誤 (比如 404)
     const errorData = error.response ? error.response.data : error.message;
     console.error('發送文件到 Telegram 失敗:', errorData);
-    // 返回一個包含錯誤信息的對象，而不是拋出異常
     return { success: false, error: errorData };
   }
+}
+
+// 新增：獲取文件臨時鏈接的函數
+async function getFileLink(file_id) {
+  try {
+    const response = await axios.get(`${TELEGRAM_API}/getFile`, {
+      params: { file_id }
+    });
+    if (response.data.ok) {
+      const filePath = response.data.result.file_path;
+      return `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${filePath}`;
+    }
+  } catch (error) {
+    console.error("獲取文件鏈接失敗:", error);
+  }
+  return null;
 }
 
 async function deleteMessage(message_id) {
@@ -67,16 +82,15 @@ async function deleteMessage(message_id) {
       chat_id: process.env.CHANNEL_ID,
       message_id,
     });
-
     if (res.data.ok) {
       let messages = loadMessages();
-      messages = messages.filter(m => m.message_id !== message_id);
+      messages = messages.filter(m => m.message_id != message_id);
       saveMessages(messages);
     }
     return res.data;
   } catch (error) {
     console.error('從 Telegram 刪除消息失敗:', error.response ? error.response.data : error.message);
-    throw error; // 刪除操作如果失敗，可以考慮繼續拋出異常
+    throw error;
   }
 }
 
@@ -84,4 +98,5 @@ module.exports = {
   sendFile,
   deleteMessage,
   loadMessages,
+  getFileLink
 };
