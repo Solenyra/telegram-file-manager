@@ -7,7 +7,7 @@ const { sendFile, deleteMessage, loadMessages } = require('./bot');
 
 const app = express();
 const upload = multer({ dest: 'uploads/' });
-const PORT = 3000;
+const PORT = 8100;
 
 app.use(session({
   secret: process.env.SESSION_SECRET || 'a_default_secret_for_development',
