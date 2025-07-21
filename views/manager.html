@@ -6,14 +6,14 @@
   <title>文件管理器</title>
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <link rel="stylesheet" href="/manager.css"> </head>
+  <link rel="stylesheet" href="/manager.css">
+</head>
 <body>
   <div class="container">
     <header class="main-header">
       <h1>文件管理器</h1>
-      <a href="/" class="back-link">返回上傳頁面</a>
+      <a href="/upload-page" class="upload-link-btn"><i class="fas fa-upload"></i> 上傳新文件</a>
     </header>
-
     <div class="controls">
       <div class="search-bar">
         <i class="fas fa-search"></i>
@@ -29,16 +29,20 @@
         <button data-category="other">其他</button>
       </div>
     </div>
-
-    <div class="file-grid" id="fileGrid">
-      </div>
+    <div class="file-grid" id="fileGrid"></div>
   </div>
-
   <div id="previewModal" class="modal">
     <span class="close-button">&times;</span>
     <div class="modal-content" id="modalContent"></div>
   </div>
-
+  <div class="action-bar" id="actionBar">
+    <span id="selectionCount">已選擇 0 個文件</span>
+    <div class="actions">
+        <button id="renameBtn" title="重命名" disabled><i class="fas fa-edit"></i> 重命名</button>
+        <button id="downloadBtn" title="下載已選" disabled><i class="fas fa-download"></i> 下載</button>
+        <button id="deleteBtn" title="刪除已選"><i class="fas fa-trash-alt"></i> 刪除</button>
+    </div>
+  </div>
   <script src="/manager.js"></script>
 </body>
 </html>
