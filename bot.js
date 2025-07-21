@@ -65,13 +65,14 @@ async function sendFile(fileBuffer, fileName, mimetype, caption = '') {
             return { success: true, data: res.data };
         } else {
             // 如果保存失敗，返回一個特定的錯誤
-            return { success: false, error: { description: "文件已上傳至 Telegram，但無法保存到本地數據庫。請檢查服務器文件權限。" } };
+            return { success: false, error: { description: "文件已上傳，但無法保存到本地數據庫。請檢查服務器文件權限。" } };
         }
       }
     }
     return { success: false, error: res.data };
   } catch (error) {
-    return { success: false, error: { description: error.response ? error.response.data.description : error.message }};
+    const errorDescription = error.response ? (error.response.data.description || JSON.stringify(error.response.data)) : error.message;
+    return { success: false, error: { description: errorDescription }};
   }
 }
 
@@ -85,15 +86,10 @@ async function deleteMessages(messageIds) {
                 chat_id: process.env.CHANNEL_ID,
                 message_id: messageId,
             });
-            if (res.data.ok) {
+            if (res.data.ok || (res.data.description && res.data.description.includes("message to delete not found"))) {
                 results.success.push(messageId);
             } else {
-                // 如果消息在遠端已不存在，也算成功
-                if (res.data.description.includes("message to delete not found")) {
-                    results.success.push(messageId);
-                } else {
-                    results.failure.push({ id: messageId, reason: res.data.description });
-                }
+                results.failure.push({ id: messageId, reason: res.data.description });
             }
         } catch (error) {
             const reason = error.response ? error.response.data.description : error.message;
@@ -105,7 +101,6 @@ async function deleteMessages(messageIds) {
         }
     }
 
-    // 在所有遠端操作完成後，再更新本地數據庫
     if (results.success.length > 0) {
         let messages = loadMessages();
         const remainingMessages = messages.filter(m => !results.success.includes(m.message_id));
