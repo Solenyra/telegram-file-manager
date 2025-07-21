@@ -31,7 +31,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const updateActionBar = () => {
         const count = selectedFiles.size;
-        selectionCountSpan.textContent = `已選擇 ${count} 個文件`;
+        
+        // *** 關鍵修正：智能顯示選中信息 ***
+        if (count === 1) {
+            const singleFileId = selectedFiles.values().next().value;
+            const file = allFiles.find(f => f.message_id === singleFileId);
+            selectionCountSpan.textContent = file ? `已選擇: ${file.fileName}` : '已選擇 1 個文件';
+            selectionCountSpan.title = file ? file.fileName : '';
+        } else {
+            selectionCountSpan.textContent = `已選擇 ${count} 個文件`;
+            selectionCountSpan.title = '';
+        }
+        
         renameBtn.disabled = count !== 1;
         downloadBtn.disabled = count === 0;
         deleteBtn.disabled = count === 0;
@@ -58,8 +69,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (selectedFiles.has(file.message_id)) {
                 card.classList.add('selected');
             }
+            // 移除了 checkbox-container 的 HTML，因為它已經被 CSS 隱藏了
             card.innerHTML = `
-                <div class="checkbox-container"><i class="fas fa-check"></i></div>
                 <div class="file-icon" data-category="${category}">${getFileIcon(category)}</div>
                 <div class="file-info">
                     <h5 title="${file.fileName}">${file.fileName}</h5>
@@ -84,7 +95,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await axios.get('/files');
             allFiles = res.data.sort((a, b) => b.date - a.date);
-            // 維持現有的選擇狀態
+            
             const existingSelected = new Set();
             allFiles.forEach(file => {
                 if(selectedFiles.has(file.message_id)) {
@@ -92,6 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
             selectedFiles = existingSelected;
+            
             updateActionBar();
             filterAndRender();
         } catch (error) {
@@ -99,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- 事件監聽 ---
+    // --- 事件監聽 (保持不變) ---
     searchInput.addEventListener('input', filterAndRender);
     categoriesContainer.addEventListener('click', (e) => {
         if (e.target.tagName === 'BUTTON') {
@@ -134,7 +146,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const res = await axios.post('/rename', { messageId, newFileName: newFileName.trim() });
                 if (res.data.success) {
                     selectedFiles.clear();
-                    updateActionBar();
                     await loadFiles();
                 } else { alert('重命名失敗: ' + (res.data.message || '未知錯誤')); }
             } catch (error) { alert('重命名請求失敗'); }
@@ -148,8 +159,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const res = await axios.post('/delete-multiple', { messageIds: Array.from(selectedFiles) });
                 alert(`成功删除 ${res.data.success.length} 個文件。`);
                 selectedFiles.clear();
-                updateActionBar();
                 await loadFiles();
+
             } catch (error) { alert('刪除請求失敗'); }
         }
     });
