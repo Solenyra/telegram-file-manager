@@ -1,8 +1,30 @@
+// --- 新增：文件選擇監聽與列表更新 ---
+const fileInput = document.getElementById('fileInput');
+const fileListContainer = document.getElementById('file-selection-list');
+
+fileInput.addEventListener('change', () => {
+    // 每次選擇都先清空舊列表
+    fileListContainer.innerHTML = '';
+    
+    if (fileInput.files.length > 0) {
+        for (const file of fileInput.files) {
+            const listItem = document.createElement('li');
+            const fileSize = (file.size / 1024 / 1024).toFixed(2); // 轉為 MB
+            listItem.innerHTML = `
+                <span>${file.name}</span>
+                <small>${fileSize} MB</small>
+            `;
+            fileListContainer.appendChild(listItem);
+        }
+    }
+});
+
+
+// --- 上傳表單提交邏輯 (保持不變) ---
 document.getElementById('uploadForm').onsubmit = async function (e) {
   e.preventDefault();
 
   const formData = new FormData();
-  const fileInput = e.target.querySelector('input[type="file"]');
   
   if (fileInput.files.length === 0) {
     showNotification('請先選擇至少一個文件', 'error');
@@ -49,6 +71,7 @@ document.getElementById('uploadForm').onsubmit = async function (e) {
         showNotification('所有文件上傳成功！', 'success');
       }
       e.target.reset();
+      fileListContainer.innerHTML = ''; // 上傳成功後清空列表
     } else {
       showNotification(res.data.message || '上傳請求失敗', 'error');
     }
