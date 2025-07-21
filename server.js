@@ -3,11 +3,13 @@ const express = require('express');
 const session = require('express-session');
 const multer = require('multer');
 const path = require('path');
+const axios = require('axios'); // 需要 axios 來代理獲取文件內容
 const { sendFile, loadMessages, getFileLink, renameFileInDb, deleteMessages } = require('./bot.js');
 
 const app = express();
 const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
+// 增加文件大小限制到 50MB
+const upload = multer({ storage: storage, limits: { fileSize: 500 * 1024 * 1024 } });
 const PORT = process.env.PORT || 8100;
 
 app.use(session({
@@ -20,11 +22,9 @@ app.use(express.static('public'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// *** 關鍵修正：添加文件名編碼修復中間件 ***
 const fixFileNameEncoding = (req, res, next) => {
     if (req.files) {
         req.files.forEach(file => {
-            // 這個轉換過程是將被錯誤解碼為 latin1 的 UTF-8 字節流還原
             const originalNameBuffer = Buffer.from(file.originalname, 'latin1');
             file.originalname = originalNameBuffer.toString('utf8');
         });
@@ -51,7 +51,6 @@ app.get('/', requireLogin, (req, res) => res.sendFile(path.join(__dirname, 'view
 app.get('/upload-page', requireLogin, (req, res) => res.sendFile(path.join(__dirname, 'views/dashboard.html')));
 
 // --- API 接口 ---
-// 在 upload.array('files') 之後，立刻使用我們的修正中間件
 app.post('/upload', requireLogin, upload.array('files'), fixFileNameEncoding, async (req, res) => {
     if (!req.files || req.files.length === 0) {
         return res.status(400).json({ success: false, message: '沒有選擇文件' });
@@ -65,6 +64,7 @@ app.post('/upload', requireLogin, upload.array('files'), fixFileNameEncoding, as
 });
 
 app.get('/files', requireLogin, (req, res) => res.json(loadMessages()));
+
 app.get('/file/:message_id', requireLogin, async (req, res) => {
   const messageId = parseInt(req.params.message_id, 10);
   const messages = loadMessages();
@@ -73,7 +73,32 @@ app.get('/file/:message_id', requireLogin, async (req, res) => {
     const link = await getFileLink(fileInfo.file_id);
     if (link) return res.json({ success: true, url: link });
   }
-  res.status(404).json({ success: false, message: '無法獲取文件。' });
+  res.status(404).json({ success: false, message: '無法獲取文件鏈接。' });
+});
+
+// *** 新增：獲取文本文件內容的接口 ***
+app.get('/file/content/:message_id', requireLogin, async (req, res) => {
+    const messageId = parseInt(req.params.message_id, 10);
+    const messages = loadMessages();
+    const fileInfo = messages.find(m => m.message_id === messageId);
+
+    if (fileInfo && fileInfo.file_id) {
+        const link = await getFileLink(fileInfo.file_id);
+        if (link) {
+            try {
+                // 從 Telegram 的臨時鏈接下載文件內容
+                const response = await axios.get(link, { responseType: 'text' });
+                res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+                res.send(response.data);
+            } catch (error) {
+                res.status(500).json({ success: false, message: '無法獲取文件內容。' });
+            }
+        } else {
+            res.status(404).json({ success: false, message: '無法獲取文件鏈接。' });
+        }
+    } else {
+        res.status(404).json({ success: false, message: '文件未找到。' });
+    }
 });
 
 app.post('/rename', requireLogin, async (req, res) => {
