@@ -8,7 +8,7 @@ const { sendFile, loadMessages, getFileLink, renameFileInDb, deleteMessages } = 
 const app = express();
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8100;
 
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-strong-random-secret-here-please-change',
@@ -19,6 +19,18 @@ app.use(session({
 app.use(express.static('public'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
+
+// *** 關鍵修正：添加文件名編碼修復中間件 ***
+const fixFileNameEncoding = (req, res, next) => {
+    if (req.files) {
+        req.files.forEach(file => {
+            // 這個轉換過程是將被錯誤解碼為 latin1 的 UTF-8 字節流還原
+            const originalNameBuffer = Buffer.from(file.originalname, 'latin1');
+            file.originalname = originalNameBuffer.toString('utf8');
+        });
+    }
+    next();
+};
 
 function requireLogin(req, res, next) {
   if (req.session.loggedIn) return next();
@@ -39,23 +51,16 @@ app.get('/', requireLogin, (req, res) => res.sendFile(path.join(__dirname, 'view
 app.get('/upload-page', requireLogin, (req, res) => res.sendFile(path.join(__dirname, 'views/dashboard.html')));
 
 // --- API 接口 ---
-app.post('/upload', requireLogin, upload.array('files'), async (req, res) => {
+// 在 upload.array('files') 之後，立刻使用我們的修正中間件
+app.post('/upload', requireLogin, upload.array('files'), fixFileNameEncoding, async (req, res) => {
     if (!req.files || req.files.length === 0) {
         return res.status(400).json({ success: false, message: '沒有選擇文件' });
     }
-    
-    console.log('\n--- [server.js] /upload 路由開始 ---');
-
     const results = [];
     for (const file of req.files) {
-        // *** 診斷日誌 1 ***
-        console.log(`[診斷 1/5] Multer 處理後，最原始的文件名 (originalname): "${file.originalname}"`);
-        
         const result = await sendFile(file.buffer, file.originalname, file.mimetype, req.body.caption || '');
         results.push(result);
     }
-    
-    console.log('--- [server.js] /upload 路由結束 ---\n');
     res.json({ success: true, results });
 });
 
