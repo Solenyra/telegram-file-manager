@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeModal = document.querySelector('.close-button');
     const actionBar = document.getElementById('actionBar');
     const selectionCountSpan = document.getElementById('selectionCount');
+    const previewBtn = document.getElementById('previewBtn');
     const renameBtn = document.getElementById('renameBtn');
     const downloadBtn = document.getElementById('downloadBtn');
     const deleteBtn = document.getElementById('deleteBtn');
@@ -14,14 +15,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let allFiles = [];
     let selectedFiles = new Set();
-    let currentVisibleFiles = []; // 用於存儲當前可見的文件
+    let currentVisibleFiles = [];
 
     const getFileCategory = (mimetype) => {
         if (!mimetype) return 'other';
         if (mimetype.startsWith('image/')) return 'image';
         if (mimetype.startsWith('video/')) return 'video';
         if (mimetype.startsWith('audio/')) return 'audio';
-        if (mimetype.startsWith('application/pdf') || mimetype.startsWith('text/') || mimetype.includes('document')) return 'document';
+        if (mimetype.startsWith('text/') || mimetype === 'application/json' || mimetype === 'application/xml') return 'document';
+        if (mimetype.startsWith('application/pdf') || mimetype.includes('document')) return 'document';
         if (mimetype.startsWith('application/zip') || mimetype.startsWith('application/x-rar-compressed') || mimetype.includes('archive')) return 'archive';
         return 'other';
     };
@@ -44,6 +46,8 @@ document.addEventListener('DOMContentLoaded', () => {
             selectionCountSpan.title = '';
         }
         
+        const canPreview = count === 1 && ['image', 'video', 'audio', 'document'].includes(getFileCategory(allFiles.find(f => f.message_id === selectedFiles.values().next().value)?.mimetype));
+        previewBtn.disabled = !canPreview;
         renameBtn.disabled = count !== 1;
         downloadBtn.disabled = count === 0;
         deleteBtn.disabled = count === 0;
@@ -54,7 +58,6 @@ document.addEventListener('DOMContentLoaded', () => {
             actionBar.classList.remove('visible');
         }
 
-        // 更新全選按鈕的狀態和圖標
         if (currentVisibleFiles.length > 0 && count === currentVisibleFiles.length) {
             selectAllBtn.innerHTML = '<i class="fas fa-times"></i>';
             selectAllBtn.title = '取消全選';
@@ -156,8 +159,55 @@ document.addEventListener('DOMContentLoaded', () => {
             allVisibleIds.forEach(id => selectedFiles.add(id));
         }
         
-        renderFiles(currentVisibleFiles); // 重新渲染以更新視覺狀態
+        renderFiles(currentVisibleFiles);
     });
+    
+    previewBtn.addEventListener('click', async () => {
+        if (previewBtn.disabled) return;
+        
+        const messageId = selectedFiles.values().next().value;
+        const file = allFiles.find(f => f.message_id === messageId);
+        if (!file) return;
+
+        modalContent.innerHTML = '正在加載預覽...';
+        modal.style.display = 'flex';
+
+        const category = getFileCategory(file.mimetype);
+
+        try {
+            if (category === 'document' && (file.mimetype.startsWith('text/') || ['application/json', 'application/xml'].includes(file.mimetype))) {
+                const res = await axios.get(`/file/content/${messageId}`);
+                modalContent.innerHTML = `<pre>${escapeHtml(res.data)}</pre>`;
+            } else {
+                const res = await axios.get(`/file/${messageId}`);
+                if (res.data.success) {
+                    const url = res.data.url;
+                    if (category === 'image') {
+                        modalContent.innerHTML = `<img src="${url}" alt="預覽">`;
+                    } else if (category === 'video') {
+                        modalContent.innerHTML = `<video controls autoplay src="${url}"></video>`;
+                    } else if (category === 'audio') {
+                        modalContent.innerHTML = `<audio controls autoplay src="${url}"></audio>`;
+                    } else {
+                        modalContent.innerHTML = `此文件類型 (${file.mimetype}) 不支持直接預覽，請下載後查看。`;
+                    }
+                } else {
+                    throw new Error('無法獲取文件鏈接');
+                }
+            }
+        } catch (error) {
+            modalContent.innerHTML = '預覽失敗，此文件可能不支持或已損壞。';
+        }
+    });
+    
+    function escapeHtml(unsafe) {
+        return unsafe
+             .replace(/&/g, "&amp;")
+             .replace(/</g, "&lt;")
+             .replace(/>/g, "&gt;")
+             .replace(/"/g, "&quot;")
+             .replace(/'/g, "&#039;");
+    }
 
     renameBtn.addEventListener('click', async () => {
         if (renameBtn.disabled) return;
