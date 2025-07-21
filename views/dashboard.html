@@ -6,13 +6,6 @@
   <title>文件上傳</title>
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
   <link rel="stylesheet" href="/manager.css"> <style>
-    :root {
-      --primary-color: #007bff;
-      --background-color: #f4f7f6;
-      --card-background: #ffffff;
-      --text-color: #333;
-      --shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
     body {
         display: flex;
         justify-content: center;
@@ -53,6 +46,31 @@
       cursor: pointer;
       font-size: 16px;
     }
+    /* *** 新增：文件選擇列表樣式 *** */
+    #file-selection-list {
+        margin-top: -10px;
+        margin-bottom: 15px;
+        padding-left: 0;
+        list-style-type: none;
+        max-height: 150px;
+        overflow-y: auto;
+        border: 1px solid #eee;
+        border-radius: 4px;
+        padding: 5px;
+    }
+    #file-selection-list li {
+        font-size: 14px;
+        padding: 5px 10px;
+        background-color: #f8f9fa;
+        margin-bottom: 5px;
+        border-radius: 3px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    #file-selection-list small {
+        color: #6c757d;
+    }
     .progress-area { margin-top: 15px; display: none; }
     .progress-bar-container { width: 100%; height: 20px; background-color: #e9ecef; border-radius: 4px; overflow: hidden; }
     .progress-bar { width: 0%; height: 100%; background-color: var(--primary-color); text-align: center; line-height: 20px; color: white; font-size: 12px; transition: width 0.4s ease; }
@@ -67,7 +85,10 @@
     <div class="card">
       <h2>文件上傳</h2>
       <form id="uploadForm">
-        <input type="file" name="files" required multiple />
+        <input type="file" name="files" id="fileInput" required multiple />
+        
+        <ul id="file-selection-list"></ul>
+
         <input type="text" name="caption" placeholder="可選的說明文字(對所有文件生效)" />
         <button type="submit">上傳</button>
       </form>
