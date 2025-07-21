@@ -10,9 +10,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const renameBtn = document.getElementById('renameBtn');
     const downloadBtn = document.getElementById('downloadBtn');
     const deleteBtn = document.getElementById('deleteBtn');
+    const selectAllBtn = document.getElementById('selectAllBtn');
 
     let allFiles = [];
     let selectedFiles = new Set();
+    let currentVisibleFiles = []; // 用於存儲當前可見的文件
 
     const getFileCategory = (mimetype) => {
         if (!mimetype) return 'other';
@@ -32,7 +34,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const updateActionBar = () => {
         const count = selectedFiles.size;
         
-        // *** 關鍵修正：智能顯示選中信息 ***
         if (count === 1) {
             const singleFileId = selectedFiles.values().next().value;
             const file = allFiles.find(f => f.message_id === singleFileId);
@@ -52,12 +53,23 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             actionBar.classList.remove('visible');
         }
+
+        // 更新全選按鈕的狀態和圖標
+        if (currentVisibleFiles.length > 0 && count === currentVisibleFiles.length) {
+            selectAllBtn.innerHTML = '<i class="fas fa-times"></i>';
+            selectAllBtn.title = '取消全選';
+        } else {
+            selectAllBtn.innerHTML = '<i class="fas fa-check-double"></i>';
+            selectAllBtn.title = '全選可見文件';
+        }
     };
 
     const renderFiles = (filesToRender) => {
+        currentVisibleFiles = filesToRender;
         fileGrid.innerHTML = '';
         if (filesToRender.length === 0) {
             fileGrid.innerHTML = '<p style="grid-column: 1 / -1; text-align: center;">沒有找到符合條件的文件。</p>';
+            updateActionBar();
             return;
         }
 
@@ -69,7 +81,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (selectedFiles.has(file.message_id)) {
                 card.classList.add('selected');
             }
-            // 移除了 checkbox-container 的 HTML，因為它已經被 CSS 隱藏了
             card.innerHTML = `
                 <div class="file-icon" data-category="${category}">${getFileIcon(category)}</div>
                 <div class="file-info">
@@ -79,6 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             fileGrid.appendChild(card);
         });
+        updateActionBar();
     };
     
     const filterAndRender = () => {
@@ -104,14 +116,13 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             selectedFiles = existingSelected;
             
-            updateActionBar();
             filterAndRender();
         } catch (error) {
             fileGrid.innerHTML = '<p>加載文件失敗，請稍後重試。</p>';
         }
     }
 
-    // --- 事件監聽 (保持不變) ---
+    // --- 事件監聽 ---
     searchInput.addEventListener('input', filterAndRender);
     categoriesContainer.addEventListener('click', (e) => {
         if (e.target.tagName === 'BUTTON') {
@@ -133,6 +144,19 @@ document.addEventListener('DOMContentLoaded', () => {
             selectedFiles.add(messageId);
         }
         updateActionBar();
+    });
+
+    selectAllBtn.addEventListener('click', () => {
+        const allVisibleIds = currentVisibleFiles.map(f => f.message_id);
+        const allCurrentlySelected = allVisibleIds.length > 0 && allVisibleIds.every(id => selectedFiles.has(id));
+
+        if (allCurrentlySelected) {
+            allVisibleIds.forEach(id => selectedFiles.delete(id));
+        } else {
+            allVisibleIds.forEach(id => selectedFiles.add(id));
+        }
+        
+        renderFiles(currentVisibleFiles); // 重新渲染以更新視覺狀態
     });
 
     renameBtn.addEventListener('click', async () => {
