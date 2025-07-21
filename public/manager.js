@@ -47,10 +47,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         const canPreview = count === 1 && ['image', 'video', 'audio', 'document'].includes(getFileCategory(allFiles.find(f => f.message_id === selectedFiles.values().next().value)?.mimetype));
-        previewBtn.disabled = !canPreview;
-        renameBtn.disabled = count !== 1;
-        downloadBtn.disabled = count === 0;
-        deleteBtn.disabled = count === 0;
+        if(previewBtn) previewBtn.disabled = !canPreview;
+        if(renameBtn) renameBtn.disabled = count !== 1;
+        if(downloadBtn) downloadBtn.disabled = count === 0;
+        if(deleteBtn) deleteBtn.disabled = count === 0;
 
         if (count > 0) {
             actionBar.classList.add('visible');
@@ -126,79 +126,88 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- 事件監聽 ---
-    searchInput.addEventListener('input', filterAndRender);
-    categoriesContainer.addEventListener('click', (e) => {
-        if (e.target.tagName === 'BUTTON') {
-            categoriesContainer.querySelector('.active').classList.remove('active');
-            e.target.classList.add('active');
-            filterAndRender();
-        }
-    });
-
-    fileGrid.addEventListener('click', (e) => {
-        const card = e.target.closest('.file-card');
-        if (!card) return;
-        const messageId = parseInt(card.dataset.messageId, 10);
-        
-        card.classList.toggle('selected');
-        if (selectedFiles.has(messageId)) {
-            selectedFiles.delete(messageId);
-        } else {
-            selectedFiles.add(messageId);
-        }
-        updateActionBar();
-    });
-
-    selectAllBtn.addEventListener('click', () => {
-        const allVisibleIds = currentVisibleFiles.map(f => f.message_id);
-        const allCurrentlySelected = allVisibleIds.length > 0 && allVisibleIds.every(id => selectedFiles.has(id));
-
-        if (allCurrentlySelected) {
-            allVisibleIds.forEach(id => selectedFiles.delete(id));
-        } else {
-            allVisibleIds.forEach(id => selectedFiles.add(id));
-        }
-        
-        renderFiles(currentVisibleFiles);
-    });
+    if(searchInput) searchInput.addEventListener('input', filterAndRender);
     
-    previewBtn.addEventListener('click', async () => {
-        if (previewBtn.disabled) return;
-        
-        const messageId = selectedFiles.values().next().value;
-        const file = allFiles.find(f => f.message_id === messageId);
-        if (!file) return;
-
-        modalContent.innerHTML = '正在加載預覽...';
-        modal.style.display = 'flex';
-
-        const category = getFileCategory(file.mimetype);
-
-        try {
-            if (category === 'document' && (file.mimetype.startsWith('text/') || ['application/json', 'application/xml'].includes(file.mimetype))) {
-                const res = await axios.get(`/file/content/${messageId}`);
-                modalContent.innerHTML = `<pre>${escapeHtml(res.data)}</pre>`;
-            } else {
-                const res = await axios.get(`/file/${messageId}`);
-                if (res.data.success) {
-                    const url = res.data.url;
-                    if (category === 'image') {
-                        modalContent.innerHTML = `<img src="${url}" alt="預覽">`;
-                    } else if (category === 'video') {
-                        modalContent.innerHTML = `<video controls autoplay src="${url}"></video>`;
-                    } else if (category === 'audio') {
-                        modalContent.innerHTML = `<audio controls autoplay src="${url}"></audio>`;
-                    } else {
-                        modalContent.innerHTML = `此文件類型 (${file.mimetype}) 不支持直接預覽，請下載後查看。`;
-                    }
-                } else {
-                    throw new Error('無法獲取文件鏈接');
-                }
+    if(categoriesContainer) {
+        categoriesContainer.addEventListener('click', (e) => {
+            if (e.target.tagName === 'BUTTON') {
+                categoriesContainer.querySelector('.active').classList.remove('active');
+                e.target.classList.add('active');
+                filterAndRender();
             }
-        } catch (error) {
-            modalContent.innerHTML = '預覽失敗，此文件可能不支持或已損壞。';
-        }
-    });
+        });
+    }
+
+    if(fileGrid) {
+        fileGrid.addEventListener('click', (e) => {
+            const card = e.target.closest('.file-card');
+            if (!card) return;
+            const messageId = parseInt(card.dataset.messageId, 10);
+            
+            card.classList.toggle('selected');
+            if (selectedFiles.has(messageId)) {
+                selectedFiles.delete(messageId);
+            } else {
+                selectedFiles.add(messageId);
+            }
+            updateActionBar();
+        });
+    }
+
+    if(selectAllBtn) {
+        selectAllBtn.addEventListener('click', () => {
+            const allVisibleIds = currentVisibleFiles.map(f => f.message_id);
+            const allCurrentlySelected = allVisibleIds.length > 0 && allVisibleIds.every(id => selectedFiles.has(id));
+
+            if (allCurrentlySelected) {
+                allVisibleIds.forEach(id => selectedFiles.delete(id));
+            } else {
+                allVisibleIds.forEach(id => selectedFiles.add(id));
+            }
+            
+            renderFiles(currentVisibleFiles); // 重新渲染以更新視覺狀態
+        });
+    }
+    
+    if(previewBtn) {
+        previewBtn.addEventListener('click', async () => {
+            if (previewBtn.disabled) return;
+            
+            const messageId = selectedFiles.values().next().value;
+            const file = allFiles.find(f => f.message_id === messageId);
+            if (!file) return;
+
+            modalContent.innerHTML = '正在加載預覽...';
+            modal.style.display = 'flex';
+
+            const category = getFileCategory(file.mimetype);
+
+            try {
+                if (category === 'document' && (file.mimetype.startsWith('text/') || ['application/json', 'application/xml'].includes(file.mimetype))) {
+                    const res = await axios.get(`/file/content/${messageId}`);
+                    modalContent.innerHTML = `<pre>${escapeHtml(res.data)}</pre>`;
+                } else {
+                    const res = await axios.get(`/file/${messageId}`);
+                    if (res.data.success) {
+                        const url = res.data.url;
+                        if (category === 'image') {
+                            modalContent.innerHTML = `<img src="${url}" alt="預覽">`;
+                        } else if (category === 'video') {
+                            modalContent.innerHTML = `<video controls autoplay src="${url}"></video>`;
+                        } else if (category === 'audio') {
+                            modalContent.innerHTML = `<audio controls autoplay src="${url}"></audio>`;
+                        } else {
+                            modalContent.innerHTML = `此文件類型 (${file.mimetype}) 不支持直接預覽，請下載後查看。`;
+                        }
+                    } else {
+                        throw new Error('無法獲取文件鏈接');
+                    }
+                }
+            } catch (error) {
+                modalContent.innerHTML = '預覽失敗，此文件可能不支持或已損壞。';
+            }
+        });
+    }
     
     function escapeHtml(unsafe) {
         return unsafe
@@ -209,62 +218,70 @@ document.addEventListener('DOMContentLoaded', () => {
              .replace(/'/g, "&#039;");
     }
 
-    renameBtn.addEventListener('click', async () => {
-        if (renameBtn.disabled) return;
-        const messageId = selectedFiles.values().next().value;
-        const file = allFiles.find(f => f.message_id === messageId);
-        const newFileName = prompt('請輸入新的文件名:', file.fileName);
+    if(renameBtn) {
+        renameBtn.addEventListener('click', async () => {
+            if (renameBtn.disabled) return;
+            const messageId = selectedFiles.values().next().value;
+            const file = allFiles.find(f => f.message_id === messageId);
+            const newFileName = prompt('請輸入新的文件名:', file.fileName);
 
-        if (newFileName && newFileName.trim() !== '' && newFileName !== file.fileName) {
-            try {
-                const res = await axios.post('/rename', { messageId, newFileName: newFileName.trim() });
-                if (res.data.success) {
+            if (newFileName && newFileName.trim() !== '' && newFileName !== file.fileName) {
+                try {
+                    const res = await axios.post('/rename', { messageId, newFileName: newFileName.trim() });
+                    if (res.data.success) {
+                        selectedFiles.clear();
+                        await loadFiles();
+                    } else { alert('重命名失敗: ' + (res.data.message || '未知錯誤')); }
+                } catch (error) { alert('重命名請求失敗'); }
+            }
+        });
+    }
+
+    if(deleteBtn) {
+        deleteBtn.addEventListener('click', async () => {
+            if (deleteBtn.disabled) return;
+            if (confirm(`確定要永久删除這 ${selectedFiles.size} 個文件嗎？`)) {
+                try {
+                    const res = await axios.post('/delete-multiple', { messageIds: Array.from(selectedFiles) });
+                    alert(`成功删除 ${res.data.success.length} 個文件。`);
                     selectedFiles.clear();
                     await loadFiles();
-                } else { alert('重命名失敗: ' + (res.data.message || '未知錯誤')); }
-            } catch (error) { alert('重命名請求失敗'); }
-        }
-    });
 
-    deleteBtn.addEventListener('click', async () => {
-        if (deleteBtn.disabled) return;
-        if (confirm(`確定要永久删除這 ${selectedFiles.size} 個文件嗎？`)) {
-            try {
-                const res = await axios.post('/delete-multiple', { messageIds: Array.from(selectedFiles) });
-                alert(`成功删除 ${res.data.success.length} 個文件。`);
-                selectedFiles.clear();
-                await loadFiles();
-
-            } catch (error) { alert('刪除請求失敗'); }
-        }
-    });
-    
-    downloadBtn.addEventListener('click', async () => {
-        if (downloadBtn.disabled) return;
-        if(selectedFiles.size > 5) {
-            alert('為防止瀏覽器攔截，一次最多下載5個文件。請減少您的選擇。');
-            return;
-        }
-        alert(`即將開始下載 ${selectedFiles.size} 個文件。請允許您的瀏覽器彈出多個窗口。`);
-
-        for (const messageId of selectedFiles) {
-            const file = allFiles.find(f => f.message_id === messageId);
-            if (file) {
-                try {
-                    const res = await axios.get(`/file/${messageId}`);
-                    if (res.data.success) {
-                        window.open(res.data.url, '_blank');
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                    }
-                } catch (error) { console.error(`下載文件 ${file.fileName} 失敗`); }
+                } catch (error) { alert('刪除請求失敗'); }
             }
-        }
-    });
+        });
+    }
     
-    closeModal.onclick = () => {
-        modal.style.display = 'none';
-        modalContent.innerHTML = '';
-    };
+    if(downloadBtn) {
+        downloadBtn.addEventListener('click', async () => {
+            if (downloadBtn.disabled) return;
+            if(selectedFiles.size > 5) {
+                alert('為防止瀏覽器攔截，一次最多下載5個文件。請減少您的選擇。');
+                return;
+            }
+            alert(`即將開始下載 ${selectedFiles.size} 個文件。請允許您的瀏覽器彈出多個窗口。`);
+
+            for (const messageId of selectedFiles) {
+                const file = allFiles.find(f => f.message_id === messageId);
+                if (file) {
+                    try {
+                        const res = await axios.get(`/file/${messageId}`);
+                        if (res.data.success) {
+                            window.open(res.data.url, '_blank');
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                        }
+                    } catch (error) { console.error(`下載文件 ${file.fileName} 失敗`); }
+                }
+            }
+        });
+    }
+    
+    if(closeModal) {
+        closeModal.onclick = () => {
+            modal.style.display = 'none';
+            modalContent.innerHTML = '';
+        };
+    }
 
     loadFiles();
 });
