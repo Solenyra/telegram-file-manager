@@ -13,14 +13,18 @@ function loadMessages() {
     if (fs.existsSync(DATA_FILE)) {
       return JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
     }
-  } catch (e) { console.error("讀取 messages.json 失敗:", e); }
+  } catch (e) {
+    console.error("讀取 messages.json 失敗:", e);
+  }
   return [];
 }
 
 function saveMessages(messages) {
   try {
     fs.writeFileSync(DATA_FILE, JSON.stringify(messages, null, 2));
-  } catch (e) { console.error("寫入 messages.json 失敗:", e); }
+  } catch (e) {
+    console.error("寫入 messages.json 失敗:", e);
+  }
 }
 
 // --- 導出的模塊函數 ---
@@ -63,18 +67,29 @@ async function sendFile(fileBuffer, fileName, mimetype, caption = '') {
 }
 
 async function getFileLink(file_id) {
-  if (!file_id || typeof file_id !== 'string') return null;
+  if (!file_id || typeof file_id !== 'string') {
+      console.error("無效的 file_id 傳入 getFileLink:", file_id);
+      return null;
+  }
+  
   const cleaned_file_id = file_id.trim();
+
   try {
-    const response = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: cleaned_file_id } });
+    const response = await axios.get(`${TELEGRAM_API}/getFile`, {
+      params: { file_id: cleaned_file_id }
+    });
     if (response.data.ok) {
       const filePath = response.data.result.file_path;
       return `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${filePath}`;
+    } else {
+      console.error("Telegram getFile API 返回錯誤:", response.data);
+      return null;
     }
   } catch (error) {
-    console.error("通過 getFile 獲取文件鏈接失敗:", error.response ? error.response.data : error.message);
+    const errorData = error.response ? error.response.data : error.message;
+    console.error("通過 getFile 獲取文件鏈接失敗:", errorData);
+    return null;
   }
-  return null;
 }
 
 async function renameFileInDb(messageId, newFileName) {
@@ -91,6 +106,8 @@ async function renameFileInDb(messageId, newFileName) {
 async function deleteMessages(messageIds) {
     const results = { success: [], failure: [] };
     const messages = loadMessages();
+    // 先過濾出需要刪除的和需要保留的
+    const messagesToDelete = messages.filter(m => messageIds.includes(m.message_id));
     const remainingMessages = messages.filter(m => !messageIds.includes(m.message_id));
 
     for (const messageId of messageIds) {
@@ -105,10 +122,16 @@ async function deleteMessages(messageIds) {
                 results.failure.push({ id: messageId, reason: res.data.description });
             }
         } catch (error) {
-            results.failure.push({ id: messageId, reason: error.response ? error.response.data.description : error.message });
+            // 即使 Telegram 刪除失敗 (例如消息已不存在)，也視為本地需要處理
+            const reason = error.response ? error.response.data.description : error.message;
+            if (reason.includes("message to delete not found")) {
+                results.success.push(messageId); // 遠端已不存在，也算成功
+            } else {
+                results.failure.push({ id: messageId, reason });
+            }
         }
     }
-    // 無論成功與否，都更新本地數據庫
+    
     saveMessages(remainingMessages);
     return results;
 }
