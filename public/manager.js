@@ -14,27 +14,42 @@ document.addEventListener('DOMContentLoaded', () => {
     let allFiles = [];
     let selectedFiles = new Set();
 
-    const getFileCategory = (mimetype) => { /* ... 之前的代碼保持不變 ... */ };
-    const getFileIcon = (category) => { /* ... */ };
+    const getFileCategory = (mimetype) => {
+        if (!mimetype) return 'other';
+        if (mimetype.startsWith('image/')) return 'image';
+        if (mimetype.startsWith('video/')) return 'video';
+        if (mimetype.startsWith('audio/')) return 'audio';
+        if (mimetype.startsWith('application/pdf') || mimetype.startsWith('text/') || mimetype.includes('document')) return 'document';
+        if (mimetype.startsWith('application/zip') || mimetype.startsWith('application/x-rar-compressed')) return 'archive';
+        return 'other';
+    };
+
+    const getFileIcon = (category) => {
+        const icons = { image: 'fa-file-image', video: 'fa-file-video', audio: 'fa-file-audio', document: 'fa-file-alt', archive: 'fa-file-archive', other: 'fa-file' };
+        return `<i class="fas ${icons[category] || icons.other}"></i>`;
+    };
 
     const updateActionBar = () => {
         const count = selectedFiles.size;
+        selectionCountSpan.textContent = `已選擇 ${count} 個文件`;
+        renameBtn.disabled = count !== 1;
+        downloadBtn.disabled = count === 0;
+        deleteBtn.disabled = count === 0;
+
         if (count > 0) {
             actionBar.classList.add('visible');
-            selectionCountSpan.textContent = `已選擇 ${count} 個文件`;
         } else {
             actionBar.classList.remove('visible');
         }
-        renameBtn.disabled = count !== 1;
-        downloadBtn.disabled = count === 0;
     };
 
     const renderFiles = (filesToRender) => {
         fileGrid.innerHTML = '';
         if (filesToRender.length === 0) {
-            fileGrid.innerHTML = '<p>沒有找到符合條件的文件。</p>';
+            fileGrid.innerHTML = '<p style="grid-column: 1 / -1; text-align: center;">沒有找到符合條件的文件。</p>';
             return;
         }
+
         filesToRender.forEach(file => {
             const category = getFileCategory(file.mimetype);
             const card = document.createElement('div');
@@ -45,9 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             card.innerHTML = `
                 <div class="checkbox-container"><i class="fas fa-check"></i></div>
-                <div class="file-icon" data-category="${category}">
-                    ${getFileIcon(category)}
-                </div>
+                <div class="file-icon" data-category="${category}">${getFileIcon(category)}</div>
                 <div class="file-info">
                     <h5 title="${file.fileName}">${file.fileName}</h5>
                     <p>${new Date(file.date).toLocaleString()}</p>
@@ -56,30 +69,53 @@ document.addEventListener('DOMContentLoaded', () => {
             fileGrid.appendChild(card);
         });
     };
+    
+    const filterAndRender = () => {
+        const searchTerm = searchInput.value.toLowerCase();
+        const activeCategory = categoriesContainer.querySelector('.active').dataset.category;
+        const filtered = allFiles.filter(file => 
+            (activeCategory === 'all' || getFileCategory(file.mimetype) === activeCategory) &&
+            file.fileName.toLowerCase().includes(searchTerm)
+        );
+        renderFiles(filtered);
+    };
 
-    const filterAndRender = () => { /* ... 之前的代碼保持不變 ... */ };
+    async function loadFiles() {
+        try {
+            const res = await axios.get('/files');
+            allFiles = res.data.sort((a, b) => b.date - a.date);
+            filterAndRender();
+        } catch (error) {
+            fileGrid.innerHTML = '<p>加載文件失敗，請稍後重試。</p>';
+        }
+    }
 
-    async function loadFiles() { /* ... */ }
-
+    // --- 事件監聽 ---
     searchInput.addEventListener('input', filterAndRender);
-    categoriesContainer.addEventListener('click', (e) => { /* ... */ });
+    categoriesContainer.addEventListener('click', (e) => {
+        if (e.target.tagName === 'BUTTON') {
+            categoriesContainer.querySelector('.active').classList.remove('active');
+            e.target.classList.add('active');
+            filterAndRender();
+        }
+    });
 
     fileGrid.addEventListener('click', (e) => {
         const card = e.target.closest('.file-card');
         if (!card) return;
         const messageId = parseInt(card.dataset.messageId, 10);
         
+        card.classList.toggle('selected');
         if (selectedFiles.has(messageId)) {
             selectedFiles.delete(messageId);
-            card.classList.remove('selected');
         } else {
             selectedFiles.add(messageId);
-            card.classList.add('selected');
         }
         updateActionBar();
     });
 
     renameBtn.addEventListener('click', async () => {
+        if (renameBtn.disabled) return;
         const messageId = selectedFiles.values().next().value;
         const file = allFiles.find(f => f.message_id === messageId);
         const newFileName = prompt('請輸入新的文件名:', file.fileName);
@@ -88,21 +124,16 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const res = await axios.post('/rename', { messageId, newFileName: newFileName.trim() });
                 if (res.data.success) {
-                    alert('重命名成功');
                     selectedFiles.clear();
                     updateActionBar();
                     await loadFiles();
-                } else {
-                    alert('重命名失敗: ' + (res.data.message || '未知錯誤'));
-                }
-            } catch (error) {
-                alert('重命名請求失敗');
-            }
+                } else { alert('重命名失敗: ' + (res.data.message || '未知錯誤')); }
+            } catch (error) { alert('重命名請求失敗'); }
         }
     });
 
     deleteBtn.addEventListener('click', async () => {
-        if (selectedFiles.size === 0) return;
+        if (deleteBtn.disabled) return;
         if (confirm(`確定要永久删除這 ${selectedFiles.size} 個文件嗎？`)) {
             try {
                 const res = await axios.post('/delete-multiple', { messageIds: Array.from(selectedFiles) });
@@ -110,34 +141,37 @@ document.addEventListener('DOMContentLoaded', () => {
                 selectedFiles.clear();
                 updateActionBar();
                 await loadFiles();
-            } catch (error) {
-                alert('刪除請求失敗');
-            }
+            } catch (error) { alert('刪除請求失敗'); }
         }
     });
     
     downloadBtn.addEventListener('click', async () => {
+        if (downloadBtn.disabled) return;
+        if(selectedFiles.size > 5) {
+            alert('為防止瀏覽器攔截，一次最多下載5個文件。請減少您的選擇。');
+            return;
+        }
+        alert(`即將開始下載 ${selectedFiles.size} 個文件。請允許您的瀏覽器彈出多個窗口。`);
+
         for (const messageId of selectedFiles) {
             const file = allFiles.find(f => f.message_id === messageId);
             if (file) {
                 try {
                     const res = await axios.get(`/file/${messageId}`);
                     if (res.data.success) {
-                        const a = document.createElement('a');
-                        a.href = res.data.url;
-                        a.download = file.fileName;
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        await new Promise(resolve => setTimeout(resolve, 300)); // 防止瀏覽器攔截彈窗
+                        // 使用 window.open 在新標籤頁中觸發下載，更可靠
+                        window.open(res.data.url, '_blank');
+                        await new Promise(resolve => setTimeout(resolve, 500)); // 間隔
                     }
-                } catch (error) {
-                    console.error(`下載文件 ${file.fileName} 失敗`);
-                }
+                } catch (error) { console.error(`下載文件 ${file.fileName} 失敗`); }
             }
         }
     });
+    
+    closeModal.onclick = () => {
+        modal.style.display = 'none';
+        modalContent.innerHTML = '';
+    };
 
-    closeModal.onclick = () => { /* ... */ };
     loadFiles();
 });
