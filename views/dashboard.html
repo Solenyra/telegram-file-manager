@@ -3,6 +3,27 @@
 <head>
   <title>Telegram 文件管理</title>
   <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <style>
+    body { font-family: sans-serif; }
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 10px 20px;
+      border-radius: 5px;
+      color: white;
+      z-index: 1000;
+    }
+    .notification.success { background-color: #4CAF50; }
+    .notification.error { background-color: #f44336; }
+    #fileList li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px;
+      border-bottom: 1px solid #eee;
+    }
+  </style>
 </head>
 <body>
   <h2>文件上传</h2>
