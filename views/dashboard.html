@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Telegram 文件管理</title>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<body>
+  <h2>文件上传</h2>
+  <form id="uploadForm">
+    <input type="file" name="file" required />
+    <input type="text" name="caption" placeholder="说明" />
+    <button type="submit">上传</button>
+  </form>
+
+  <h2>已上传文件</h2>
+  <ul id="fileList"></ul>
+
+  <script src="/script.js"></script>
+</body>
+</html>
