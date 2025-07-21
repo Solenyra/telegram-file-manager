@@ -78,6 +78,7 @@ body {
 .categories {
     white-space: nowrap;
     overflow-x: auto;
+    padding-bottom: 5px;
 }
 
 .categories button {
