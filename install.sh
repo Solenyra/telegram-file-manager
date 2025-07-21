@@ -6,18 +6,18 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-echo -e "${GREEN}--- 開始安裝 Telegram 文件管理器 (優化版) ---${NC}"
+echo -e "${GREEN}--- 開始安裝 Telegram 文件管理器 (直接安裝到當前目錄) ---${NC}"
+echo -e "${RED}================================================================${NC}"
+echo -e "${YELLOW}警告：此腳本會將文件直接下載到您當前的目錄中。${NC}"
+echo -e "${YELLOW}為安全起見，請務必在一個新建的空文件夾中運行此命令！${NC}"
+echo -e "${RED}================================================================${NC}"
+# 等待5秒，給用戶時間閱讀警告
+sleep 5
 
-# 檢查並刪除舊目錄
-if [ -d "telegram-file-manager" ]; then
-    echo -e "${YELLOW}檢測到舊目錄，正在移除...${NC}"
-    rm -rf telegram-file-manager
-fi
-
-# 1. 克隆項目
-echo -e "\n${YELLOW}[1/5] 正在從 GitHub 克隆項目...${NC}"
-git clone https://github.com/Limkon/telegram-file-manager.git || { echo -e "${RED}錯誤：克隆項目失敗。${NC}"; exit 1; }
-cd telegram-file-manager
+# 1. 克隆項目到當前目錄
+echo -e "\n${YELLOW}[1/5] 正在從 GitHub 克隆項目到當前目錄...${NC}"
+# 使用 . 來指定當前目錄
+git clone https://github.com/Limkon/telegram-file-manager.git . || { echo -e "${RED}錯誤：克隆項目失敗。${NC}"; exit 1; }
 
 # 2. 安裝依賴
 echo -e "\n${YELLOW}[2/5] 正在安裝 Node.js 依賴...${NC}"
@@ -30,7 +30,7 @@ if [ $? -ne 0 ]; then
     echo -e "${YELLOW}警告：自動修復漏洞失敗，建議手動檢查。${NC}"
 fi
 
-# 4. 創建配置文件 (更智能的方式)
+# 4. 創建配置文件
 echo -e "\n${YELLOW}[4/5] 正在創建 .env 配置文件...${NC}"
 if [ -f ".env.example" ]; then
     cp .env.example .env
@@ -40,7 +40,6 @@ elif [ -f ".evn" ]; then
     echo "已從舊的 .evn 文件創建 .env 文件。"
 else
     echo "未找到模板文件，正在創建一個新的 .env 文件..."
-    # 創建一個包含必要鍵的 .env 文件
     cat > .env << EOL
 BOT_TOKEN=
 CHANNEL_ID=
@@ -56,10 +55,10 @@ echo "SESSION_SECRET=${SESSION_SECRET}" >> .env
 
 echo -e "\n${GREEN}================================================================${NC}"
 echo -e "${GREEN}✅ 安裝和配置已成功完成！${NC}"
-echo -e "${YELLOW}下一步關鍵操作:${NC}"
-echo "  1. 請使用文本編輯器打開 '.env' 文件。"
+echo -e "${YELLOW}您已經在項目目錄中，下一步操作:${NC}"
+echo "  1. 請使用文本編輯器打開當前目錄下的 '.env' 文件。"
 echo "     例如，運行命令: ${GREEN}nano .env${NC}"
 echo "  2. 在文件中填入您自己的個人信息 (BOT_TOKEN, CHANNEL_ID, ADMIN_PASS)。"
-echo "  3. 配置完成後，請啟動應用:"
+echo "  3. 配置完成後，請直接啟動應用:"
 echo "     ${GREEN}npm start${NC}"
 echo -e "${GREEN}================================================================${NC}"
