@@ -7,6 +7,7 @@ const FormData = require('form-data');
 const TELEGRAM_API = `https://api.telegram.org/bot${process.env.BOT_TOKEN}`;
 const DATA_FILE = path.join(__dirname, 'data/messages.json');
 
+// --- 內部函數 ---
 function loadMessages() {
   try {
     if (fs.existsSync(DATA_FILE)) {
@@ -26,7 +27,8 @@ function saveMessages(messages) {
   }
 }
 
-// 增加了 mimetype 參數
+// --- 導出的模塊函數 ---
+
 async function sendFile(fileBuffer, fileName, mimetype, caption = '') {
   const formData = new FormData();
   formData.append('chat_id', process.env.CHANNEL_ID);
@@ -38,19 +40,19 @@ async function sendFile(fileBuffer, fileName, mimetype, caption = '') {
       headers: formData.getHeaders(),
     });
 
-    if (res.data.ok) {
+    if (res.data.ok && res.data.result.document && res.data.result.document.file_id) {
       const messages = loadMessages();
       messages.push({
         fileName,
-        mimetype, // 保存文件的 MIME type
+        mimetype,
         message_id: res.data.result.message_id,
-        file_id: res.data.result.document.file_id, // 保存 file_id 以便後續獲取文件
+        file_id: res.data.result.document.file_id, // 確保 file_id 存在
         date: Date.now(),
       });
       saveMessages(messages);
       return { success: true, data: res.data };
     } else {
-      console.error('Telegram API 返回錯誤:', res.data);
+      console.error('Telegram API 返回的數據格式不正確或操作失敗:', res.data);
       return { success: false, error: res.data };
     }
   } catch (error) {
@@ -60,38 +62,57 @@ async function sendFile(fileBuffer, fileName, mimetype, caption = '') {
   }
 }
 
-// 新增：獲取文件臨時鏈接的函數
 async function getFileLink(file_id) {
+  // 檢查傳入的 file_id 是否有效
+  if (!file_id || typeof file_id !== 'string') {
+      console.error("無效的 file_id 傳入 getFileLink:", file_id);
+      return null;
+  }
+  
+  // *** 關鍵修復和診斷 ***
+  const cleaned_file_id = file_id.trim();
+  console.log(`[診斷] 準備使用 file_id: "${cleaned_file_id}" 來獲取文件鏈接。`);
+
   try {
     const response = await axios.get(`${TELEGRAM_API}/getFile`, {
-      params: { file_id }
+      params: { file_id: cleaned_file_id } // 使用清理過的 ID
     });
     if (response.data.ok) {
       const filePath = response.data.result.file_path;
       return `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${filePath}`;
+    } else {
+      // 如果 Telegram 返回 ok: false
+      console.error("Telegram getFile API 返回錯誤:", response.data);
+      return null;
     }
   } catch (error) {
-    console.error("獲取文件鏈接失敗:", error);
+    const errorData = error.response ? error.response.data : error.message;
+    console.error("通過 getFile 獲取文件鏈接失敗:", errorData);
+    return null;
   }
-  return null;
 }
 
 async function deleteMessage(message_id) {
-  try {
-    const res = await axios.post(`${TELEGRAM_API}/deleteMessage`, {
-      chat_id: process.env.CHANNEL_ID,
-      message_id,
-    });
-    if (res.data.ok) {
-      let messages = loadMessages();
-      messages = messages.filter(m => m.message_id != message_id);
-      saveMessages(messages);
+    const messageIdNum = parseInt(message_id, 10);
+    if (isNaN(messageIdNum)) return; // 如果不是數字則直接返回
+
+    try {
+        const res = await axios.post(`${TELEGRAM_API}/deleteMessage`, {
+            chat_id: process.env.CHANNEL_ID,
+            message_id: messageIdNum,
+        });
+
+        if (res.data.ok) {
+            let messages = loadMessages();
+            // 使用嚴格比較 (===) 來過濾，更安全
+            messages = messages.filter(m => m.message_id !== messageIdNum);
+            saveMessages(messages);
+        }
+        return res.data;
+    } catch (error) {
+        console.error('從 Telegram 刪除消息失敗:', error.response ? error.response.data : error.message);
+        throw error;
     }
-    return res.data;
-  } catch (error) {
-    console.error('從 Telegram 刪除消息失敗:', error.response ? error.response.data : error.message);
-    throw error;
-  }
 }
 
 module.exports = {
