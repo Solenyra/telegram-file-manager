@@ -5,9 +5,10 @@ const path = require('path');
 const FormData = require('form-data');
 
 const TELEGRAM_API = `https://api.telegram.org/bot${process.env.BOT_TOKEN}`;
-const DATA_FILE = path.join(__dirname, 'data/messages.json');
+const DATA_DIR = path.join(__dirname, 'data'); // 定義 data 文件夾路徑
+const DATA_FILE = path.join(DATA_DIR, 'messages.json'); // 定義 messages.json 的完整路徑
 
-// --- 內部函數 (保持不變) ---
+// --- 內部函數 ---
 function loadMessages() {
   try {
     if (fs.existsSync(DATA_FILE)) {
@@ -21,6 +22,11 @@ function loadMessages() {
 
 function saveMessages(messages) {
   try {
+    // *** 關鍵修正：確保 data 文件夾存在 ***
+    if (!fs.existsSync(DATA_DIR)) {
+      console.log(" 'data' 文件夾不存在，正在自動創建...");
+      fs.mkdirSync(DATA_DIR);
+    }
     fs.writeFileSync(DATA_FILE, JSON.stringify(messages, null, 2), 'utf-8');
   } catch (e) {
     console.error("寫入 messages.json 失敗:", e);
@@ -40,27 +46,24 @@ async function sendFile(fileBuffer, fileName, mimetype, caption = '') {
       headers: formData.getHeaders(),
     });
 
-    // *** 關鍵修正：兼容不同的媒體類型 ***
     if (res.data.ok) {
-        const result = res.data.result;
-        // 嘗試從 document, video, audio, photo 等常見類型中獲取文件信息
-        const fileData = result.document || result.video || result.audio || result.photo;
+      const result = res.data.result;
+      const fileData = result.document || result.video || result.audio || result.photo;
 
-        if (fileData && fileData.file_id) {
-            const messages = loadMessages();
-            messages.push({
-                fileName,
-                mimetype: fileData.mime_type || mimetype, // 優先使用 Telegram 返回的 mimetype
-                message_id: result.message_id,
-                file_id: fileData.file_id,
-                date: Date.now(),
-            });
-            saveMessages(messages);
-            return { success: true, data: res.data };
-        }
+      if (fileData && fileData.file_id) {
+        const messages = loadMessages();
+        messages.push({
+          fileName,
+          mimetype: fileData.mime_type || mimetype,
+          message_id: result.message_id,
+          file_id: fileData.file_id,
+          date: Date.now(),
+        });
+        saveMessages(messages);
+        return { success: true, data: res.data };
+      }
     }
     
-    // 如果上面的條件都不滿足，則視為失敗
     console.error('Telegram API 返回的數據格式不正確或操作失敗:', res.data);
     return { success: false, error: res.data };
 
@@ -71,7 +74,6 @@ async function sendFile(fileBuffer, fileName, mimetype, caption = '') {
   }
 }
 
-// --- 其他函數 (保持不變) ---
 async function getFileLink(file_id) {
   if (!file_id || typeof file_id !== 'string') {
       return null;
