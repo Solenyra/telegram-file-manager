@@ -119,34 +119,9 @@ body {
   box-shadow: 0 0 0 3px var(--primary-color);
 }
 
+/* *** 關鍵修正：隱藏多選框 *** */
 .checkbox-container {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  width: 22px;
-  height: 22px;
-  background-color: rgba(255,255,255,0.9);
-  border: 2px solid #ccc;
-  border-radius: 5px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 2;
-  pointer-events: none; /* 讓點擊穿透到卡片上 */
-}
-
-.checkbox-container .fa-check {
   display: none;
-  color: var(--primary-color);
-  font-size: 14px;
-}
-
-.file-card.selected .checkbox-container {
-    border-color: var(--primary-color);
-}
-
-.file-card.selected .checkbox-container .fa-check {
-  display: block;
 }
 
 .file-icon {
@@ -204,6 +179,12 @@ body {
   z-index: 1000;
 }
 
+.action-bar #selectionCount {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .action-bar.visible {
   bottom: 20px;
 }
@@ -219,6 +200,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  flex-shrink: 0;
 }
 
 .action-bar .actions button:disabled {
