@@ -1,14 +1,10 @@
-import 'dotenv/config';
-import express from 'express';
-import session from 'express-session';
-import multer from 'multer';
-import path from 'path';
-import axios from 'axios';
-import { fileURLToPath } from 'url';
-import { sendFile, loadMessages, getFileLink, renameFileInDb, deleteMessages } from './bot.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+require('dotenv').config();
+const express = require('express');
+const session = require('express-session');
+const multer = require('multer');
+const path = require('path');
+const axios = require('axios');
+const { sendFile, loadMessages, getFileLink, renameFileInDb, deleteMessages } = require('./bot.js');
 
 const app = express();
 const storage = multer.memoryStorage();
@@ -132,4 +128,4 @@ app.post('/delete-multiple', requireLogin, async (req, res) => {
     res.json(result);
 });
 
-export default app;
+module.exports = app;
