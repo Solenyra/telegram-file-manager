@@ -8,8 +8,8 @@ const { sendFile, loadMessages, getFileLink, renameFileInDb, deleteMessages } = 
 
 const app = express();
 const storage = multer.memoryStorage();
-const upload = multer({ storage: storage, limits: { fileSize: 50 * 1024 * 1024 } });
-const PORT = process.env.PORT || 3000;
+const upload = multer({ storage: storage, limits: { fileSize: 1000 * 1024 * 1024 } });
+const PORT = process.env.PORT || 8100;
 
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-strong-random-secret-here-please-change',
