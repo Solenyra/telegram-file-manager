@@ -2,6 +2,7 @@
   "name": "telegram-file-manager-cf",
   "version": "1.1.0",
   "private": true,
+  "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -9,7 +10,7 @@
     "deploy": "wrangler pages deploy public"
   },
   "dependencies": {
-    "@cloudflare/workers-express-adapter": "^1.0.2",
+    "@hono/node-server": "^1.11.2",
     "axios": "^1.6.0",
     "dotenv": "^16.3.1",
     "express": "^4.19.2",
