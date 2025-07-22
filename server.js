@@ -9,8 +9,8 @@ const { sendFile, loadMessages, getFileLink, renameFileInDb, deleteMessages } = 
 const app = express();
 const storage = multer.memoryStorage();
 // 增加文件大小限制
-const upload = multer({ storage: storage, limits: { fileSize: 50 * 1024 * 1024 } });
-const PORT = process.env.PORT || 3000;
+const upload = multer({ storage: storage, limits: { fileSize: 999 * 1024 * 1024 } });
+const PORT = process.env.PORT || 8100;
 
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-strong-random-secret-here-please-change',
@@ -132,7 +132,7 @@ app.post('/rename', requireLogin, async (req, res) => {
 
 app.post('/delete-multiple', requireLogin, async (req, res) => {
     const { messageIds } = req.body;
-    if (!messageIds || !Array.isArray(messageIds)) return res.status(400).json({ success: false, message: '無效的 messageIds。' });
+    if (!messageIds || !Array.isArray(messageIds) || messageIds.length === 0) return res.status(400).json({ success: false, message: '無效的 messageIds。' });
     const result = await deleteMessages(messageIds);
     res.json(result);
 });
