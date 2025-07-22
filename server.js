@@ -1,15 +1,19 @@
-require('dotenv').config();
-const express = require('express');
-const session = require('express-session');
-const multer = require('multer');
-const path = require('path');
-const axios = require('axios');
-const { sendFile, loadMessages, getFileLink, renameFileInDb, deleteMessages } = require('./bot.js');
+import 'dotenv/config';
+import express from 'express';
+import session from 'express-session';
+import multer from 'multer';
+import path from 'path';
+import axios from 'axios';
+import { fileURLToPath } from 'url';
+import { sendFile, loadMessages, getFileLink, renameFileInDb, deleteMessages } from './bot.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage, limits: { fileSize: 1000 * 1024 * 1024 } });
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8100;
 
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-strong-random-secret-here-please-change',
@@ -130,7 +134,7 @@ app.post('/delete-multiple', requireLogin, async (req, res) => {
 
 // Cloudflare Pages 需要一個單一的入口點
 // 我們將 Express app 導出給 Cloudflare 的 adapter
-module.exports = app;
+export default app;
 
 // 如果不是在 Cloudflare 環境下運行 (例如本地開發)，則正常監聽端口
 if (process.env.NODE_ENV !== 'production') {
