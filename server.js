@@ -8,8 +8,8 @@ const { sendFile, loadMessages, getFileLink, renameFileInDb, deleteMessages } = 
 
 const app = express();
 const storage = multer.memoryStorage();
-const upload = multer({ storage: storage, limits: { fileSize: 999 * 1024 * 1024 } });
-const PORT = process.env.PORT || 8100;
+const upload = multer({ storage: storage, limits: { fileSize: 50 * 1024 * 1024 } });
+const PORT = process.env.PORT || 3000;
 
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-strong-random-secret-here-please-change',
@@ -64,39 +64,45 @@ app.post('/upload', requireLogin, upload.array('files'), fixFileNameEncoding, as
 
 app.get('/files', requireLogin, (req, res) => res.json(loadMessages()));
 
-app.get('/download/proxy/:message_id', requireLogin, async (req, res) => {
+// *** 新增：縮略圖獲取接口 ***
+app.get('/thumbnail/:message_id', requireLogin, async (req, res) => {
     const messageId = parseInt(req.params.message_id, 10);
     const messages = loadMessages();
     const fileInfo = messages.find(m => m.message_id === messageId);
 
+    if (fileInfo && fileInfo.thumb_file_id) {
+        const link = await getFileLink(fileInfo.thumb_file_id);
+        if (link) {
+            // 重定向到 Telegram 的臨時鏈接
+            return res.redirect(link);
+        }
+    }
+    // 如果沒有縮略圖，返回一個透明的 1x1 像素圖片作為佔位符
+    const placeholder = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+    res.writeHead(200, { 'Content-Type': 'image/gif', 'Content-Length': placeholder.length });
+    res.end(placeholder);
+});
+
+app.get('/download/proxy/:message_id', requireLogin, async (req, res) => {
+    const messageId = parseInt(req.params.message_id, 10);
+    const messages = loadMessages();
+    const fileInfo = messages.find(m => m.message_id === messageId);
     if (fileInfo && fileInfo.file_id) {
         const link = await getFileLink(fileInfo.file_id);
         if (link) {
             try {
                 res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fileInfo.fileName)}`);
-                const response = await axios({
-                    method: 'get',
-                    url: link,
-                    responseType: 'stream'
-                });
+                const response = await axios({ method: 'get', url: link, responseType: 'stream' });
                 response.data.pipe(res);
-            } catch (error) {
-                console.error("代理下載失敗:", error.message);
-                res.status(500).send('從 Telegram 獲取文件失敗');
-            }
-        } else {
-            res.status(404).send('無法獲取文件鏈接');
-        }
-    } else {
-        res.status(404).send('文件信息未找到');
-    }
+            } catch (error) { res.status(500).send('從 Telegram 獲取文件失敗'); }
+        } else { res.status(404).send('無法獲取文件鏈接'); }
+    } else { res.status(404).send('文件信息未找到'); }
 });
 
 app.get('/file/content/:message_id', requireLogin, async (req, res) => {
     const messageId = parseInt(req.params.message_id, 10);
     const messages = loadMessages();
     const fileInfo = messages.find(m => m.message_id === messageId);
-
     if (fileInfo && fileInfo.file_id) {
         const link = await getFileLink(fileInfo.file_id);
         if (link) {
@@ -104,15 +110,9 @@ app.get('/file/content/:message_id', requireLogin, async (req, res) => {
                 const response = await axios.get(link, { responseType: 'text' });
                 res.setHeader('Content-Type', 'text/plain; charset=utf-8');
                 res.send(response.data);
-            } catch (error) {
-                res.status(500).json({ success: false, message: '無法獲取文件內容。' });
-            }
-        } else {
-            res.status(404).json({ success: false, message: '無法獲取文件鏈接。' });
-        }
-    } else {
-        res.status(404).json({ success: false, message: '文件未找到。' });
-    }
+            } catch (error) { res.status(500).json({ success: false, message: '無法獲取文件內容。' }); }
+        } else { res.status(404).json({ success: false, message: '無法獲取文件鏈接。' }); }
+    } else { res.status(404).json({ success: false, message: '文件未找到。' }); }
 });
 
 app.post('/rename', requireLogin, async (req, res) => {
@@ -124,7 +124,7 @@ app.post('/rename', requireLogin, async (req, res) => {
 
 app.post('/delete-multiple', requireLogin, async (req, res) => {
     const { messageIds } = req.body;
-    if (!messageIds || !Array.isArray(messageIds) || messageIds.length === 0) return res.status(400).json({ success: false, message: '無效的 messageIds。' });
+    if (!messageIds || !Array.isArray(messageIds)) return res.status(400).json({ success: false, message: '無效的 messageIds。' });
     const result = await deleteMessages(messageIds);
     res.json(result);
 });
