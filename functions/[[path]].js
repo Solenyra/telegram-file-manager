@@ -1,8 +1,10 @@
+// This file is the entry point for Cloudflare Pages Functions.
+// It imports the Express app from server.js and exports a handler
+// that allows it to be served by the Cloudflare network.
 const app = require('../server.js');
 
-// This is the correct way to handle requests in Cloudflare Pages Functions
-// It passes the context object directly to a handler.
-// `app` in this case is our Express app, which can handle the request.
-export const onRequest = async (context) => {
-    return app(context);
-};
+export function onRequest(context) {
+  // The `app` is an Express app instance. By returning it,
+  // Cloudflare Pages knows how to handle incoming requests.
+  return app(context.request);
+}
