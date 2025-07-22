@@ -3,13 +3,13 @@ const express = require('express');
 const session = require('express-session');
 const multer = require('multer');
 const path = require('path');
-const axios = require('axios'); // 需要 axios 來代理獲取文件內容
+const axios = require('axios'); // 確保引入 axios
 const { sendFile, loadMessages, getFileLink, renameFileInDb, deleteMessages } = require('./bot.js');
 
 const app = express();
 const storage = multer.memoryStorage();
-// 增加文件大小限制到 50MB
-const upload = multer({ storage: storage, limits: { fileSize: 500 * 1024 * 1024 } });
+// 增加文件大小限制
+const upload = multer({ storage: storage, limits: { fileSize: 999 * 1024 * 1024 } });
 const PORT = process.env.PORT || 8100;
 
 app.use(session({
@@ -22,6 +22,7 @@ app.use(express.static('public'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+// 中文文件名亂碼修復中間件
 const fixFileNameEncoding = (req, res, next) => {
     if (req.files) {
         req.files.forEach(file => {
@@ -39,6 +40,7 @@ function requireLogin(req, res, next) {
 
 // --- 路由 ---
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'views/login.html')));
+
 app.post('/login', (req, res) => {
   if (req.body.username === process.env.ADMIN_USER && req.body.password === process.env.ADMIN_PASS) {
     req.session.loggedIn = true;
@@ -47,6 +49,7 @@ app.post('/login', (req, res) => {
     res.status(401).send('Invalid credentials');
   }
 });
+
 app.get('/', requireLogin, (req, res) => res.sendFile(path.join(__dirname, 'views/manager.html')));
 app.get('/upload-page', requireLogin, (req, res) => res.sendFile(path.join(__dirname, 'views/dashboard.html')));
 
@@ -65,18 +68,39 @@ app.post('/upload', requireLogin, upload.array('files'), fixFileNameEncoding, as
 
 app.get('/files', requireLogin, (req, res) => res.json(loadMessages()));
 
-app.get('/file/:message_id', requireLogin, async (req, res) => {
-  const messageId = parseInt(req.params.message_id, 10);
-  const messages = loadMessages();
-  const fileInfo = messages.find(m => m.message_id === messageId);
-  if (fileInfo && fileInfo.file_id) {
-    const link = await getFileLink(fileInfo.file_id);
-    if (link) return res.json({ success: true, url: link });
-  }
-  res.status(404).json({ success: false, message: '無法獲取文件鏈接。' });
+// *** 新增：服務器代理下載接口 ***
+app.get('/download/proxy/:message_id', requireLogin, async (req, res) => {
+    const messageId = parseInt(req.params.message_id, 10);
+    const messages = loadMessages();
+    const fileInfo = messages.find(m => m.message_id === messageId);
+
+    if (fileInfo && fileInfo.file_id) {
+        const link = await getFileLink(fileInfo.file_id);
+        if (link) {
+            try {
+                // 關鍵：設置響應頭，強制瀏覽器下載並使用原始文件名
+                // filename*=UTF-8''... 是為了處理包含特殊字符（如中文）的文件名
+                res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fileInfo.fileName)}`);
+
+                // 從 Telegram 獲取文件流並直接 pipe 給客戶端響應
+                const response = await axios({
+                    method: 'get',
+                    url: link,
+                    responseType: 'stream'
+                });
+                response.data.pipe(res);
+            } catch (error) {
+                console.error("代理下載失敗:", error.message);
+                res.status(500).send('從 Telegram 獲取文件失敗');
+            }
+        } else {
+            res.status(404).send('無法獲取文件鏈接');
+        }
+    } else {
+        res.status(404).send('文件信息未找到');
+    }
 });
 
-// *** 新增：獲取文本文件內容的接口 ***
 app.get('/file/content/:message_id', requireLogin, async (req, res) => {
     const messageId = parseInt(req.params.message_id, 10);
     const messages = loadMessages();
@@ -86,7 +110,6 @@ app.get('/file/content/:message_id', requireLogin, async (req, res) => {
         const link = await getFileLink(fileInfo.file_id);
         if (link) {
             try {
-                // 從 Telegram 的臨時鏈接下載文件內容
                 const response = await axios.get(link, { responseType: 'text' });
                 res.setHeader('Content-Type', 'text/plain; charset=utf-8');
                 res.send(response.data);
@@ -110,7 +133,7 @@ app.post('/rename', requireLogin, async (req, res) => {
 
 app.post('/delete-multiple', requireLogin, async (req, res) => {
     const { messageIds } = req.body;
-    if (!messageIds || !Array.isArray(messageIds)) return res.status(400).json({ success: false, message: '無效的 messageIds。' });
+    if (!messageIds || !Array.isArray(messageIds) || messageIds.length === 0) return res.status(400).json({ success: false, message: '無效的 messageIds。' });
     const result = await deleteMessages(messageIds);
     res.json(result);
 });
