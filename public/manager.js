@@ -28,7 +28,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return 'other';
     };
 
-    const getFileIcon = (category) => {
+    const getFileIcon = (file) => {
+        // *** 關鍵修正：優先顯示縮略圖 ***
+        if (file.thumb_file_id) {
+            return `<img src="/thumbnail/${file.message_id}" alt="縮略圖" loading="lazy">`;
+        }
+        const category = getFileCategory(file.mimetype);
         const icons = { image: 'fa-file-image', video: 'fa-file-video', audio: 'fa-file-audio', document: 'fa-file-alt', archive: 'fa-file-archive', other: 'fa-file' };
         return `<i class="fas ${icons[category] || icons.other}"></i>`;
     };
@@ -77,7 +82,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         filesToRender.forEach(file => {
-            const category = getFileCategory(file.mimetype);
             const card = document.createElement('div');
             card.className = 'file-card';
             card.dataset.messageId = file.message_id;
@@ -85,7 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 card.classList.add('selected');
             }
             card.innerHTML = `
-                <div class="file-icon" data-category="${category}">${getFileIcon(category)}</div>
+                <div class="file-icon">${getFileIcon(file)}</div>
                 <div class="file-info">
                     <h5 title="${file.fileName}">${file.fileName}</h5>
                     <p>${new Date(file.date).toLocaleString()}</p>
@@ -125,7 +129,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- 事件監聽 ---
     if(searchInput) searchInput.addEventListener('input', filterAndRender);
     
     if(categoriesContainer) {
@@ -158,13 +161,11 @@ document.addEventListener('DOMContentLoaded', () => {
         selectAllBtn.addEventListener('click', () => {
             const allVisibleIds = currentVisibleFiles.map(f => f.message_id);
             const allCurrentlySelected = allVisibleIds.length > 0 && allVisibleIds.every(id => selectedFiles.has(id));
-
             if (allCurrentlySelected) {
                 allVisibleIds.forEach(id => selectedFiles.delete(id));
             } else {
                 allVisibleIds.forEach(id => selectedFiles.add(id));
             }
-            
             renderFiles(currentVisibleFiles);
         });
     }
@@ -172,16 +173,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if(previewBtn) {
         previewBtn.addEventListener('click', async () => {
             if (previewBtn.disabled) return;
-            
             const messageId = selectedFiles.values().next().value;
             const file = allFiles.find(f => f.message_id === messageId);
             if (!file) return;
-
             modalContent.innerHTML = '正在加載預覽...';
             modal.style.display = 'flex';
-
             const category = getFileCategory(file.mimetype);
-
             try {
                 if (category === 'document' && (file.mimetype.startsWith('text/') || ['application/json', 'application/xml'].includes(file.mimetype))) {
                     const res = await axios.get(`/file/content/${messageId}`);
@@ -190,32 +187,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     const res = await axios.get(`/file/${messageId}`);
                     if (res.data.success) {
                         const url = res.data.url;
-                        if (category === 'image') {
-                            modalContent.innerHTML = `<img src="${url}" alt="預覽">`;
-                        } else if (category === 'video') {
-                            modalContent.innerHTML = `<video controls autoplay src="${url}"></video>`;
-                        } else if (category === 'audio') {
-                            modalContent.innerHTML = `<audio controls autoplay src="${url}"></audio>`;
-                        } else {
-                            modalContent.innerHTML = `此文件類型 (${file.mimetype}) 不支持直接預覽，請下載後查看。`;
-                        }
-                    } else {
-                        throw new Error('無法獲取文件鏈接');
-                    }
+                        if (category === 'image') modalContent.innerHTML = `<img src="${url}" alt="預覽">`;
+                        else if (category === 'video') modalContent.innerHTML = `<video controls autoplay src="${url}"></video>`;
+                        else if (category === 'audio') modalContent.innerHTML = `<audio controls autoplay src="${url}"></audio>`;
+                        else modalContent.innerHTML = `此文件類型 (${file.mimetype}) 不支持直接預覽，請下載後查看。`;
+                    } else { throw new Error('無法獲取文件鏈接'); }
                 }
-            } catch (error) {
-                modalContent.innerHTML = '預覽失敗，此文件可能不支持或已損壞。';
-            }
+            } catch (error) { modalContent.innerHTML = '預覽失敗，此文件可能不支持或已損壞。'; }
         });
     }
     
     function escapeHtml(unsafe) {
-        return unsafe
-             .replace(/&/g, "&amp;")
-             .replace(/</g, "&lt;")
-             .replace(/>/g, "&gt;")
-             .replace(/"/g, "&quot;")
-             .replace(/'/g, "&#039;");
+        return unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
     }
 
     if(renameBtn) {
@@ -224,7 +207,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const messageId = selectedFiles.values().next().value;
             const file = allFiles.find(f => f.message_id === messageId);
             const newFileName = prompt('請輸入新的文件名:', file.fileName);
-
             if (newFileName && newFileName.trim() !== '' && newFileName !== file.fileName) {
                 try {
                     const res = await axios.post('/rename', { messageId, newFileName: newFileName.trim() });
@@ -246,7 +228,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     alert(`成功删除 ${res.data.success.length} 個文件。`);
                     selectedFiles.clear();
                     await loadFiles();
-
                 } catch (error) { alert('刪除請求失敗'); }
             }
         });
@@ -255,8 +236,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if(downloadBtn) {
         downloadBtn.addEventListener('click', () => {
             if (downloadBtn.disabled) return;
-            
-            // 使用 window.location.href 觸發下載
             selectedFiles.forEach(messageId => {
                 window.location.href = `/download/proxy/${messageId}`;
             });
