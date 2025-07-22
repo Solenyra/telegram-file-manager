@@ -9,8 +9,8 @@ const { sendFile, loadMessages, getFileLink, renameFileInDb, deleteMessages } = 
 const app = express();
 const storage = multer.memoryStorage();
 // 增加文件大小限制
-const upload = multer({ storage: storage, limits: { fileSize: 999 * 1024 * 1024 } });
-const PORT = process.env.PORT || 8100;
+const upload = multer({ storage: storage, limits: { fileSize: 50 * 1024 * 1024 } });
+const PORT = process.env.PORT || 3000;
 
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-strong-random-secret-here-please-change',
@@ -68,7 +68,7 @@ app.post('/upload', requireLogin, upload.array('files'), fixFileNameEncoding, as
 
 app.get('/files', requireLogin, (req, res) => res.json(loadMessages()));
 
-// *** 新增：服務器代理下載接口 ***
+// *** 關鍵修正：這就是您當前版本可能缺少的路由 ***
 app.get('/download/proxy/:message_id', requireLogin, async (req, res) => {
     const messageId = parseInt(req.params.message_id, 10);
     const messages = loadMessages();
@@ -78,8 +78,7 @@ app.get('/download/proxy/:message_id', requireLogin, async (req, res) => {
         const link = await getFileLink(fileInfo.file_id);
         if (link) {
             try {
-                // 關鍵：設置響應頭，強制瀏覽器下載並使用原始文件名
-                // filename*=UTF-8''... 是為了處理包含特殊字符（如中文）的文件名
+                // 設置響應頭，強制瀏覽器下載並使用原始文件名
                 res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fileInfo.fileName)}`);
 
                 // 從 Telegram 獲取文件流並直接 pipe 給客戶端響應
@@ -133,7 +132,7 @@ app.post('/rename', requireLogin, async (req, res) => {
 
 app.post('/delete-multiple', requireLogin, async (req, res) => {
     const { messageIds } = req.body;
-    if (!messageIds || !Array.isArray(messageIds) || messageIds.length === 0) return res.status(400).json({ success: false, message: '無效的 messageIds。' });
+    if (!messageIds || !Array.isArray(messageIds)) return res.status(400).json({ success: false, message: '無效的 messageIds。' });
     const result = await deleteMessages(messageIds);
     res.json(result);
 });
