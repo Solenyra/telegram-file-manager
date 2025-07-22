@@ -8,35 +8,28 @@ const TELEGRAM_API = `https://api.telegram.org/bot${process.env.BOT_TOKEN}`;
 const DATA_DIR = path.join(__dirname, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'messages.json');
 
-// --- 內部函數 ---
 function loadMessages() {
   try {
     if (fs.existsSync(DATA_FILE)) {
       return JSON.parse(fs.readFileSync(DATA_FILE, 'utf-8'));
     }
-  } catch (e) {
-    console.error("讀取 messages.json 失敗:", e);
-  }
+  } catch (e) { console.error("讀取 messages.json 失敗:", e); }
   return [];
 }
 
-// *** 關鍵修正 1：讓保存函數返回操作結果 ***
 function saveMessages(messages) {
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR);
     }
     fs.writeFileSync(DATA_FILE, JSON.stringify(messages, null, 2), 'utf-8');
-    return true; // 保存成功
+    return true;
   } catch (e) {
     console.error("寫入 messages.json 失敗:", e);
-    return false; // 保存失敗
+    return false;
   }
 }
 
-// --- 導出的模塊函數 ---
-
-// *** 關鍵修正 2：檢查保存結果 ***
 async function sendFile(fileBuffer, fileName, mimetype, caption = '') {
   try {
     const formData = new FormData();
@@ -52,20 +45,26 @@ async function sendFile(fileBuffer, fileName, mimetype, caption = '') {
 
       if (fileData && fileData.file_id) {
         const messages = loadMessages();
+        
+        // *** 關鍵修正：捕獲縮略圖 file_id ***
+        let thumb_file_id = null;
+        if (fileData.thumb) {
+            thumb_file_id = fileData.thumb.file_id;
+        }
+
         messages.push({
           fileName,
           mimetype: fileData.mime_type || mimetype,
           message_id: result.message_id,
           file_id: fileData.file_id,
+          thumb_file_id: thumb_file_id, // 保存縮略圖ID
           date: Date.now(),
         });
         
-        // 檢查保存是否成功
         if (saveMessages(messages)) {
             return { success: true, data: res.data };
         } else {
-            // 如果保存失敗，返回一個特定的錯誤
-            return { success: false, error: { description: "文件已上傳，但無法保存到本地數據庫。請檢查服務器文件權限。" } };
+            return { success: false, error: { description: "文件已上傳，但無法保存到本地數據庫。" } };
         }
       }
     }
@@ -76,9 +75,9 @@ async function sendFile(fileBuffer, fileName, mimetype, caption = '') {
   }
 }
 
-// *** 關鍵修正 3：重構刪除邏輯 ***
 async function deleteMessages(messageIds) {
     const results = { success: [], failure: [] };
+    if (!Array.isArray(messageIds)) return results;
     
     for (const messageId of messageIds) {
         try {
@@ -110,7 +109,6 @@ async function deleteMessages(messageIds) {
     return results;
 }
 
-// 其他函數保持不變
 async function getFileLink(file_id) {
   if (!file_id || typeof file_id !== 'string') return null;
   const cleaned_file_id = file_id.trim();
