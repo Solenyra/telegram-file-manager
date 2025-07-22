@@ -123,13 +123,14 @@ body {
   display: none;
 }
 
+/* *** 關鍵修正：縮小圖標尺寸 *** */
 .file-icon {
-  height: 120px;
+  height: 40px; /* 從 120px 縮小到 40px */
   display: flex;
   justify-content: center;
   align-items: center;
   background-color: #f1f3f5;
-  font-size: 50px;
+  font-size: 24px; /* 同步縮小字體圖標 */
   color: #adb5bd;
 }
 
@@ -158,10 +159,9 @@ body {
   color: #6c757d;
 }
 
-/* 浮動操作欄 */
 .action-bar {
   position: fixed;
-  bottom: -100px; /* 初始隱藏 */
+  bottom: -100px;
   left: 50%;
   transform: translateX(-50%);
   width: 90%;
@@ -227,7 +227,6 @@ body {
   background: #c82333;
 }
 
-/* Modal */
 .modal {
   display: none;
   position: fixed;
