@@ -1,5 +1,8 @@
 const app = require('../server.js');
 
-export async function onRequest(context) {
-  return app(context.request);
-}
+// This is the correct way to handle requests in Cloudflare Pages Functions
+// It passes the context object directly to a handler.
+// `app` in this case is our Express app, which can handle the request.
+export const onRequest = async (context) => {
+    return app(context);
+};
