@@ -16,7 +16,8 @@ app.use(session({
   saveUninitialized: false,
 }));
 
-app.use(express.static('public'));
+// Serve static files from the 'public' directory
+app.use(express.static(path.join(__dirname, '../public')));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
@@ -36,7 +37,7 @@ function requireLogin(req, res, next) {
 }
 
 // --- Routes ---
-app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'views/login.html')));
+app.get('/login', (req, res) => res.sendFile(path.join(__dirname, '../views/login.html')));
 app.post('/login', (req, res) => {
   if (req.body.username === process.env.ADMIN_USER && req.body.password === process.env.ADMIN_PASS) {
     req.session.loggedIn = true;
@@ -45,8 +46,9 @@ app.post('/login', (req, res) => {
     res.status(401).send('Invalid credentials');
   }
 });
-app.get('/', requireLogin, (req, res) => res.sendFile(path.join(__dirname, 'views/manager.html')));
-app.get('/upload-page', requireLogin, (req, res) => res.sendFile(path.join(__dirname, 'views/dashboard.html')));
+app.get('/', requireLogin, (req, res) => res.sendFile(path.join(__dirname, '../views/manager.html')));
+app.get('/upload-page', requireLogin, (req, res) => res.sendFile(path.join(__dirname, '../views/dashboard.html')));
+
 
 // --- API Endpoints ---
 app.post('/upload', requireLogin, upload.array('files'), fixFileNameEncoding, async (req, res) => {
