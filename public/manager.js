@@ -267,7 +267,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     try {
                         const res = await axios.get(`/file/${messageId}`);
                         if (res.data.success) {
-                            window.open(res.data.url, '_blank');
+                            const a = document.createElement('a');
+                            a.href = res.data.url;
+                            a.download = file.fileName; // 關鍵代碼
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
                             await new Promise(resolve => setTimeout(resolve, 500));
                         }
                     } catch (error) { console.error(`下載文件 ${file.fileName} 失敗`); }
