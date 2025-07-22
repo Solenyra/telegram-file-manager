@@ -1,10 +1,10 @@
-import 'dotenv/config';
-import axios from 'axios';
-import FormData from 'form-data';
+require('dotenv').config();
+const axios = require('axios');
+const FormData = require('form-data');
 
 const TELEGRAM_API = `https://api.telegram.org/bot${process.env.BOT_TOKEN}`;
 
-export async function loadMessages() {
+async function loadMessages() {
   try {
     const messages = await process.env.DATA.get('messages', { type: 'json' });
     return messages || [];
@@ -24,7 +24,7 @@ async function saveMessages(messages) {
   }
 }
 
-export async function sendFile(fileBuffer, fileName, mimetype, caption = '') {
+async function sendFile(fileBuffer, fileName, mimetype, caption = '') {
   try {
     const formData = new FormData();
     formData.append('chat_id', process.env.CHANNEL_ID);
@@ -64,7 +64,7 @@ export async function sendFile(fileBuffer, fileName, mimetype, caption = '') {
   }
 }
 
-export async function deleteMessages(messageIds) {
+async function deleteMessages(messageIds) {
     const results = { success: [], failure: [] };
     if (!Array.isArray(messageIds)) return results;
 
@@ -97,7 +97,7 @@ export async function deleteMessages(messageIds) {
     return results;
 }
 
-export async function getFileLink(file_id) {
+async function getFileLink(file_id) {
   if (!file_id || typeof file_id !== 'string') return null;
   const cleaned_file_id = file_id.trim();
   try {
@@ -107,7 +107,7 @@ export async function getFileLink(file_id) {
   return null;
 }
 
-export async function renameFileInDb(messageId, newFileName) {
+async function renameFileInDb(messageId, newFileName) {
     const messages = await loadMessages();
     const fileIndex = messages.findIndex(m => m.message_id === messageId);
     if (fileIndex > -1) {
@@ -118,3 +118,11 @@ export async function renameFileInDb(messageId, newFileName) {
     }
     return { success: false, message: 'File not found or failed to save.' };
 }
+
+module.exports = {
+  sendFile,
+  loadMessages,
+  getFileLink,
+  renameFileInDb,
+  deleteMessages,
+};
