@@ -4,24 +4,22 @@ import FormData from 'form-data';
 
 const TELEGRAM_API = `https://api.telegram.org/bot${process.env.BOT_TOKEN}`;
 
-// KV 版本的 loadMessages
 export async function loadMessages() {
   try {
     const messages = await process.env.DATA.get('messages', { type: 'json' });
     return messages || [];
   } catch (e) {
-    console.error("從 KV 讀取 messages 失敗:", e);
+    console.error("Failed to read messages from KV:", e);
     return [];
   }
 }
 
-// KV 版本的 saveMessages
 async function saveMessages(messages) {
   try {
     await process.env.DATA.put('messages', JSON.stringify(messages, null, 2));
     return true;
   } catch (e) {
-    console.error("寫入 messages 到 KV 失敗:", e);
+    console.error("Failed to write messages to KV:", e);
     return false;
   }
 }
@@ -41,11 +39,7 @@ export async function sendFile(fileBuffer, fileName, mimetype, caption = '') {
 
       if (fileData && fileData.file_id) {
         const messages = await loadMessages();
-
-        let thumb_file_id = null;
-        if (fileData.thumb) {
-            thumb_file_id = fileData.thumb.file_id;
-        }
+        let thumb_file_id = fileData.thumb ? fileData.thumb.file_id : null;
 
         messages.push({
           fileName,
@@ -59,7 +53,7 @@ export async function sendFile(fileBuffer, fileName, mimetype, caption = '') {
         if (await saveMessages(messages)) {
             return { success: true, data: res.data };
         } else {
-            return { success: false, error: { description: "文件已上傳，但無法保存到 KV 數據庫。" } };
+            return { success: false, error: { description: "File uploaded but failed to save to KV database." } };
         }
       }
     }
@@ -100,7 +94,6 @@ export async function deleteMessages(messageIds) {
         const remainingMessages = messages.filter(m => !results.success.includes(m.message_id));
         await saveMessages(remainingMessages);
     }
-
     return results;
 }
 
@@ -110,7 +103,7 @@ export async function getFileLink(file_id) {
   try {
     const response = await axios.get(`${TELEGRAM_API}/getFile`, { params: { file_id: cleaned_file_id } });
     if (response.data.ok) return `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${response.data.result.file_path}`;
-  } catch (error) { console.error("獲取文件鏈接失敗:", error.response?.data?.description || error.message); }
+  } catch (error) { console.error("Failed to get file link:", error.response?.data?.description || error.message); }
   return null;
 }
 
@@ -123,5 +116,5 @@ export async function renameFileInDb(messageId, newFileName) {
             return { success: true, file: messages[fileIndex] };
         }
     }
-    return { success: false, message: '文件未找到或保存失敗。' };
+    return { success: false, message: 'File not found or failed to save.' };
 }
