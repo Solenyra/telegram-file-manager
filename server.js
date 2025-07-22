@@ -9,7 +9,6 @@ const { sendFile, loadMessages, getFileLink, renameFileInDb, deleteMessages } = 
 const app = express();
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage, limits: { fileSize: 1000 * 1024 * 1024 } });
-const PORT = process.env.PORT || 8100;
 
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-strong-random-secret-here-please-change',
@@ -63,7 +62,8 @@ app.post('/upload', requireLogin, upload.array('files'), fixFileNameEncoding, as
 });
 
 app.get('/files', requireLogin, async (req, res) => {
-    res.json(await loadMessages());
+    const messages = await loadMessages();
+    res.json(messages);
 });
 
 app.get('/thumbnail/:message_id', requireLogin, async (req, res) => {
