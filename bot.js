@@ -1,14 +1,12 @@
-require('dotenv').config();
-const axios = require('axios');
-const FormData = require('form-data');
+import 'dotenv/config';
+import axios from 'axios';
+import FormData from 'form-data';
 
 const TELEGRAM_API = `https://api.telegram.org/bot${process.env.BOT_TOKEN}`;
 
 // KV 版本的 loadMessages
-async function loadMessages() {
+export async function loadMessages() {
   try {
-    // 從綁定的 KV 命名空間 'DATA' 中讀取 'messages'
-    // Cloudflare Pages/Workers 會自動將綁定的 KV 注入 process.env
     const messages = await process.env.DATA.get('messages', { type: 'json' });
     return messages || [];
   } catch (e) {
@@ -20,7 +18,6 @@ async function loadMessages() {
 // KV 版本的 saveMessages
 async function saveMessages(messages) {
   try {
-    // 將 messages 寫入到 KV 中
     await process.env.DATA.put('messages', JSON.stringify(messages, null, 2));
     return true;
   } catch (e) {
@@ -29,7 +26,7 @@ async function saveMessages(messages) {
   }
 }
 
-async function sendFile(fileBuffer, fileName, mimetype, caption = '') {
+export async function sendFile(fileBuffer, fileName, mimetype, caption = '') {
   try {
     const formData = new FormData();
     formData.append('chat_id', process.env.CHANNEL_ID);
@@ -43,7 +40,7 @@ async function sendFile(fileBuffer, fileName, mimetype, caption = '') {
       const fileData = result.document || result.video || result.audio || result.photo;
 
       if (fileData && fileData.file_id) {
-        const messages = await loadMessages(); // 改為異步讀取
+        const messages = await loadMessages();
 
         let thumb_file_id = null;
         if (fileData.thumb) {
@@ -59,7 +56,7 @@ async function sendFile(fileBuffer, fileName, mimetype, caption = '') {
           date: Date.now(),
         });
 
-        if (await saveMessages(messages)) { // 改為異步儲存
+        if (await saveMessages(messages)) {
             return { success: true, data: res.data };
         } else {
             return { success: false, error: { description: "文件已上傳，但無法保存到 KV 數據庫。" } };
@@ -73,7 +70,7 @@ async function sendFile(fileBuffer, fileName, mimetype, caption = '') {
   }
 }
 
-async function deleteMessages(messageIds) {
+export async function deleteMessages(messageIds) {
     const results = { success: [], failure: [] };
     if (!Array.isArray(messageIds)) return results;
 
@@ -99,15 +96,15 @@ async function deleteMessages(messageIds) {
     }
 
     if (results.success.length > 0) {
-        let messages = await loadMessages(); // 改為異步讀取
+        let messages = await loadMessages();
         const remainingMessages = messages.filter(m => !results.success.includes(m.message_id));
-        await saveMessages(remainingMessages); // 改為異步儲存
+        await saveMessages(remainingMessages);
     }
 
     return results;
 }
 
-async function getFileLink(file_id) {
+export async function getFileLink(file_id) {
   if (!file_id || typeof file_id !== 'string') return null;
   const cleaned_file_id = file_id.trim();
   try {
@@ -117,16 +114,14 @@ async function getFileLink(file_id) {
   return null;
 }
 
-async function renameFileInDb(messageId, newFileName) {
-    const messages = await loadMessages(); // 改為異步讀取
+export async function renameFileInDb(messageId, newFileName) {
+    const messages = await loadMessages();
     const fileIndex = messages.findIndex(m => m.message_id === messageId);
     if (fileIndex > -1) {
         messages[fileIndex].fileName = newFileName;
-        if (await saveMessages(messages)) { // 改為異步儲存
+        if (await saveMessages(messages)) {
             return { success: true, file: messages[fileIndex] };
         }
     }
     return { success: false, message: '文件未找到或保存失敗。' };
 }
-
-module.exports = { sendFile, loadMessages, getFileLink, renameFileInDb, deleteMessages };
