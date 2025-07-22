@@ -256,11 +256,8 @@ document.addEventListener('DOMContentLoaded', () => {
         downloadBtn.addEventListener('click', () => {
             if (downloadBtn.disabled) return;
             
-            alert(`即將開始下載 ${selectedFiles.size} 個文件。您的瀏覽器可能會逐一下載，請稍候。`);
-
-            // *** 關鍵修正：直接請求後端代理接口 ***
+            // 使用 window.location.href 觸發下載
             selectedFiles.forEach(messageId => {
-                // 直接改變 window.location 來觸發下載，這比 iframe 更可靠
                 window.location.href = `/download/proxy/${messageId}`;
             });
         });
