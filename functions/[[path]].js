@@ -1,5 +1,5 @@
-import { Hono } from 'hono';
-import { handle } from '@hono/node-server/vercel';
-import app from '../server.js';
+const app = require('../server.js');
 
-export const onRequest = handle(app);
+export async function onRequest(context) {
+  return app(context.request);
+}
