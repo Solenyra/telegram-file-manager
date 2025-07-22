@@ -129,8 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- 事件監聽 ---
-    if(searchInput) searchInput.addEventListener('input', filterAndRender);
-    
+    if(searchInput) { searchInput.addEventListener('input', filterAndRender); }
     if(categoriesContainer) {
         categoriesContainer.addEventListener('click', (e) => {
             if (e.target.tagName === 'BUTTON') {
@@ -140,7 +139,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-
     if(fileGrid) {
         fileGrid.addEventListener('click', (e) => {
             const card = e.target.closest('.file-card');
@@ -156,7 +154,6 @@ document.addEventListener('DOMContentLoaded', () => {
             updateActionBar();
         });
     }
-
     if(selectAllBtn) {
         selectAllBtn.addEventListener('click', () => {
             const allVisibleIds = currentVisibleFiles.map(f => f.message_id);
@@ -167,7 +164,6 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 allVisibleIds.forEach(id => selectedFiles.add(id));
             }
-            
             renderFiles(currentVisibleFiles);
         });
     }
@@ -187,25 +183,21 @@ document.addEventListener('DOMContentLoaded', () => {
             const category = getFileCategory(file.mimetype);
 
             try {
-                if (category === 'document' && (file.mimetype.startsWith('text/') || ['application/json', 'application/xml'].includes(file.mimetype))) {
+                // 對於媒體文件，我們現在也使用代理來避免跨域問題
+                if (category === 'image' || category === 'video' || category === 'audio') {
+                    const url = `/download/proxy/${messageId}`; // 使用下載代理路由
+                    if (category === 'image') {
+                        modalContent.innerHTML = `<img src="${url}" alt="預覽">`;
+                    } else if (category === 'video') {
+                        modalContent.innerHTML = `<video controls autoplay src="${url}"></video>`;
+                    } else if (category === 'audio') {
+                        modalContent.innerHTML = `<audio controls autoplay src="${url}"></audio>`;
+                    }
+                } else if (category === 'document' && (file.mimetype.startsWith('text/') || ['application/json', 'application/xml'].includes(file.mimetype))) {
                     const res = await axios.get(`/file/content/${messageId}`);
                     modalContent.innerHTML = `<pre>${escapeHtml(res.data)}</pre>`;
                 } else {
-                    const res = await axios.get(`/file/${messageId}`);
-                    if (res.data.success) {
-                        const url = res.data.url;
-                        if (category === 'image') {
-                            modalContent.innerHTML = `<img src="${url}" alt="預覽">`;
-                        } else if (category === 'video') {
-                            modalContent.innerHTML = `<video controls autoplay src="${url}"></video>`;
-                        } else if (category === 'audio') {
-                            modalContent.innerHTML = `<audio controls autoplay src="${url}"></audio>`;
-                        } else {
-                            modalContent.innerHTML = `此文件類型 (${file.mimetype}) 不支持直接預覽，請下載後查看。`;
-                        }
-                    } else {
-                        throw new Error('無法獲取文件鏈接');
-                    }
+                     modalContent.innerHTML = `此文件類型 (${file.mimetype}) 不支持直接預覽，請下載後查看。`;
                 }
             } catch (error) {
                 modalContent.innerHTML = '預覽失敗，此文件可能不支持或已損壞。';
@@ -243,7 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if(deleteBtn) {
         deleteBtn.addEventListener('click', async () => {
-            if (deleteBtn.disabled) return;
+           if (deleteBtn.disabled) return;
             if (confirm(`確定要永久删除這 ${selectedFiles.size} 個文件嗎？`)) {
                 try {
                     const res = await axios.post('/delete-multiple', { messageIds: Array.from(selectedFiles) });
