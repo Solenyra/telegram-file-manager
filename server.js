@@ -3,14 +3,13 @@ const express = require('express');
 const session = require('express-session');
 const multer = require('multer');
 const path = require('path');
-const axios = require('axios'); // 確保引入 axios
+const axios = require('axios');
 const { sendFile, loadMessages, getFileLink, renameFileInDb, deleteMessages } = require('./bot.js');
 
 const app = express();
 const storage = multer.memoryStorage();
-// 增加文件大小限制
-const upload = multer({ storage: storage, limits: { fileSize: 999 * 1024 * 1024 } });
-const PORT = process.env.PORT || 8100;
+const upload = multer({ storage: storage, limits: { fileSize: 50 * 1024 * 1024 } });
+const PORT = process.env.PORT || 3000;
 
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-strong-random-secret-here-please-change',
@@ -22,7 +21,6 @@ app.use(express.static('public'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// 中文文件名亂碼修復中間件
 const fixFileNameEncoding = (req, res, next) => {
     if (req.files) {
         req.files.forEach(file => {
@@ -40,7 +38,6 @@ function requireLogin(req, res, next) {
 
 // --- 路由 ---
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'views/login.html')));
-
 app.post('/login', (req, res) => {
   if (req.body.username === process.env.ADMIN_USER && req.body.password === process.env.ADMIN_PASS) {
     req.session.loggedIn = true;
@@ -49,7 +46,6 @@ app.post('/login', (req, res) => {
     res.status(401).send('Invalid credentials');
   }
 });
-
 app.get('/', requireLogin, (req, res) => res.sendFile(path.join(__dirname, 'views/manager.html')));
 app.get('/upload-page', requireLogin, (req, res) => res.sendFile(path.join(__dirname, 'views/dashboard.html')));
 
@@ -68,7 +64,6 @@ app.post('/upload', requireLogin, upload.array('files'), fixFileNameEncoding, as
 
 app.get('/files', requireLogin, (req, res) => res.json(loadMessages()));
 
-// *** 關鍵修正：這就是您當前版本可能缺少的路由 ***
 app.get('/download/proxy/:message_id', requireLogin, async (req, res) => {
     const messageId = parseInt(req.params.message_id, 10);
     const messages = loadMessages();
@@ -78,10 +73,7 @@ app.get('/download/proxy/:message_id', requireLogin, async (req, res) => {
         const link = await getFileLink(fileInfo.file_id);
         if (link) {
             try {
-                // 設置響應頭，強制瀏覽器下載並使用原始文件名
                 res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fileInfo.fileName)}`);
-
-                // 從 Telegram 獲取文件流並直接 pipe 給客戶端響應
                 const response = await axios({
                     method: 'get',
                     url: link,
