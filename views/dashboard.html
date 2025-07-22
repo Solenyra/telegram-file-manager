@@ -18,12 +18,20 @@
         max-width: 600px;
         padding-top: 20px;
     }
+    /* *** 關鍵修正：修改為按鈕樣式 *** */
     .manager-link {
         display: inline-block;
         margin-bottom: 20px;
-        color: var(--primary-color);
+        padding: 10px 15px;
+        background-color: #6c757d; /* 按鈕背景色 */
+        color: white; /* 文字顏色 */
         text-decoration: none;
         font-weight: 500;
+        border-radius: 5px; /* 圓角 */
+        transition: background-color 0.2s; /* 過渡效果 */
+    }
+    .manager-link:hover {
+        background-color: #5a6268; /* 鼠標懸停時的顏色 */
     }
     .card {
         background-color: var(--card-background);
@@ -46,7 +54,6 @@
       cursor: pointer;
       font-size: 16px;
     }
-    /* *** 新增：文件選擇列表樣式 *** */
     #file-selection-list {
         margin-top: -10px;
         margin-bottom: 15px;
